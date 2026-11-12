@@ -28,6 +28,7 @@
     fanfare(t0 = 0) { if (!ok()) return; const t = ctx.currentTime + t0; [[523, 0], [659, .12], [784, .24], [1046, .36]].forEach(([f, x]) => { tone('triangle', f, t + x, 0.01, 0.35, x === .36 ? 0.9 : 0.2); tone('square', f / 2, t + x, 0.01, 0.06, 0.2); }); },
     sad(t0 = 0) { if (!ok()) return; const t = ctx.currentTime + t0; [[392, 0], [370, .35], [349, .7], [330, 1.05]].forEach(([f, x], i) => tone('sawtooth', f, t + x, 0.03, 0.18, i === 3 ? 1.0 : 0.3, i === 3 ? 260 : 0)); },
     stamp(t0 = 0) { if (!ok()) return; const t = ctx.currentTime + t0; tone('sine', 90, t, 0.002, 1, 0.35, 45); burst(t, 'lowpass', 900, 0.6, 0.9, 0.18); },
+    ring(t0 = 0) { if (!ok()) return; const t = ctx.currentTime + t0; [[1319, 0], [988, .14], [1175, .28], [1568, .42], [1319, .7], [988, .84], [1175, .98], [1568, 1.12]].forEach(([f, x]) => { tone('sine', f, t + x, 0.005, 0.32, 0.16); tone('triangle', f * 2, t + x, 0.005, 0.06, 0.1); }); },
     heartbeat(n = 3, t0 = 0) { if (!ok()) return; for (let i = 0; i < n; i++) { const t = ctx.currentTime + t0 + i * 0.8; tone('sine', 60, t, 0.01, 0.9, 0.18, 40); tone('sine', 55, t + 0.22, 0.01, 0.6, 0.2, 38); } },
   };
   ['pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, unlock, { passive: true }));

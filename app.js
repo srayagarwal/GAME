@@ -151,7 +151,7 @@
         <div class="calc"><div><span>Revenue</span><b>${r.rev1}</b></div><div><span>Incident hits</span><b class="r">−${r.pen1}</b></div>${r.bust1 ? `<div><span>Over budget</span><b class="r">−${r.bust1}</b></div>` : ''}<div><span>Named owner</span><b>×${r.gov1}</b></div><div><span>Trust damage</span><b>÷${r.trust1}</b></div></div>
         ${miniBoard('mid', 'HOUR 6 LEADERBOARD')}<div class="tease">😴 Something from Day 1 is still asleep…</div></div></div>`);
     }
-    if (ph() === 'cfo' && !ui.seen.cfo) { ui.seen.cfo = true; ui.fx = [{ t: 0.4, f: r.dq ? 'dq' : 'ok' }]; }
+    if (ph() === 'cfo' && !ui.seen.cfo) { ui.seen.cfo = true; ui.call = { stage: 'ring' }; }
     const fin = ph() === 'cfo', [rk, of] = fin ? rankOf('fin', p => !scoreOf(p).dq) : rankOf('fin');
     const verdict = fin ? (r.dq ? `<div class="verdict bad vstamp"><b>❌ Disqualified by the CFO</b>You spent ${r.total} against an annual AI budget of ${G.TOTAL}. IOUs count.</div>`
       : `<div class="verdict ok vstamp"><b>✓ CFO review: on budget</b>Spent ${r.total} of ${G.TOTAL}.</div>`) : '';
@@ -175,11 +175,53 @@
     if (p === 'p1' || p === 'p2') return m['l' + partOf()] ? vLocked(false) : vShop();
     if (p === 'p1x' || p === 'p2x') return vLocked(true);
     if (p === 'd1') return vReveal(1);
-    return vReveal(6);
+    return vReveal(6) + (p === 'cfo' ? callHTML() : '');
+  }
+  /* ---------- the CFO calls (or emails, if you decline) ---------- */
+  function cfoLines() {
+    const m = me(), r = scoreOf(m), n = m.name, iou = (m.b1 || 0) + (m.b2 || 0);
+    const [rk, of] = rankOf('fin', p => !scoreOf(p).dq);
+    if (r.dq) return [`Hi ${n}, it’s the CFO.`, `I’ve just closed the books on Nova.`, `You spent ${r.total} credits. The annual AI budget was ${G.TOTAL}.`,
+      iou ? `And those IOUs you signed for ${iou} chips? They count.` : `Every credit over the line counts.`, `So I’m afraid your score of ${r.fin} doesn’t stand.`, `You’re disqualified. No budget, no bonus.`];
+    return [`Hi ${n}, it’s the CFO.`, `I’ve just closed the books on Nova.`, `You spent ${r.total} of your ${G.TOTAL} credits. On budget.`,
+      `Your score of ${r.fin} stands. You finish number ${rk} of ${of} on the official board.`, rk <= 3 ? `That’s a podium finish. Well done.` : `Thanks for keeping Nova inside the budget.`];
+  }
+  function callHTML() {
+    const c = ui.call; if (!c || c.stage === 'done') return '';
+    const head = sub => `<div class="cl-top"><div class="cl-sub" ${sub === 'timer' ? 'id="ctimer"' : ''}>${sub === 'timer' ? '00:00' : sub}</div><div class="cl-av">CFO</div><div class="cl-name">Chief Financial Officer</div><div class="cl-org">NBD Bank · Head office</div></div>`;
+    if (c.stage === 'ring') return `<div class="call ring">${head('incoming call…')}<div class="cl-btns"><button class="cl-b no" id="cdecl"><span>✆</span><small>Decline</small></button><button class="cl-b yes" id="cacc"><span>✆</span><small>Accept</small></button></div></div>`;
+    if (c.stage === 'talk') return `<div class="call">${head('timer')}<div class="cl-cap" id="ccap"></div><div class="cl-btns"><button class="cl-b no" id="chang"><span>✆</span><small>End call</small></button></div></div>`;
+    if (c.stage === 'mail') { const r = scoreOf(me()), t = new Date(), hh = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+      return `<div class="mailov"><div class="mailbn">✉️ <b>CFO, NBD Bank</b> · ${r.dq ? 'Nova budget review: action taken' : 'Nova budget review: approved'}</div><div class="mailv">
+        <div class="mvh"><span>Inbox</span><span>${hh}</span></div><div class="mvs">${r.dq ? 'Nova budget review: you are disqualified' : 'Nova budget review: approved'}</div>
+        <div class="mvf"><div class="mva">CFO</div><div><b>Chief Financial Officer</b><small>to ${esc(me().name)} · cc: Board of Directors</small></div></div>
+        <div class="mvb">${cfoLines().map(l => `<p>${esc(l)}</p>`).join('')}<p class="sig">— Office of the CFO, NBD Bank</p></div>
+        <button class="btn" id="cmail">${r.dq ? 'Close' : 'See my result'}</button></div></div>`; }
+    return '';
+  }
+  let ringT = null, callT = null;
+  function stopRing() { clearInterval(ringT); ringT = null; try { navigator.vibrate && navigator.vibrate(0); } catch (e) {} }
+  function endCall() { stopRing(); clearInterval(callT); try { speechSynthesis.cancel(); } catch (e) {} ui.call = { stage: 'done' }; const r = scoreOf(me()); ui.fx = [{ t: 0.3, f: r.dq ? 'dq' : 'ok' }]; render(true); }
+  function startRing() { if (ringT) return; const ring = () => { SFX.ring(); buzz([500, 250, 500]); }; ring(); ringT = setInterval(ring, 2600); }
+  function acceptCall() {
+    stopRing(); ui.call = { stage: 'talk' }; render(true);
+    const lines = cfoLines(), t0 = Date.now();
+    callT = setInterval(() => { const el = document.getElementById('ctimer'); if (el) { const s = Math.floor((Date.now() - t0) / 1000); el.textContent = '00:' + String(s).padStart(2, '0'); } }, 500);
+    const show = i => { const cap = document.getElementById('ccap'); if (cap) cap.innerHTML = lines.slice(0, i + 1).map((l, j) => `<p class="${j === i ? 'now' : ''}">${esc(l)}</p>`).join(''); };
+    const synth = window.speechSynthesis; let voice = null;
+    try { const vs = synth.getVoices(); voice = vs.find(v => /en-GB/i.test(v.lang) && /female|serena|kate|martha|libby|sonia/i.test(v.name)) || vs.find(v => /en-GB/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)); } catch (e) {}
+    const next = i => { if (!ui.call || ui.call.stage !== 'talk') return; if (i >= lines.length) { setTimeout(() => { if (ui.call && ui.call.stage === 'talk') endCall(); }, 1200); return; }
+      show(i);
+      if (synth && window.SpeechSynthesisUtterance) { const u = new SpeechSynthesisUtterance(lines[i]); if (voice) u.voice = voice; u.rate = 0.98; u.pitch = 0.95;
+        const st = Date.now(), min = 900 + lines[i].length * 50; let done = false;
+        const go = () => { if (done) return; done = true; setTimeout(() => next(i + 1), Math.max(250, min - (Date.now() - st))); };
+        u.onend = go; u.onerror = go; setTimeout(go, 1500 + lines[i].length * 90); try { synth.speak(u); } catch (e) { go(); } }
+      else setTimeout(() => next(i + 1), 1400 + lines[i].length * 55); };
+    setTimeout(() => next(0), 700);
   }
   function playerSig() {
     const m = me(), p = ph();
-    let s = p + '|' + JSON.stringify(m) + '|' + JSON.stringify(ui.overlay) + '|' + ui.pick + '|' + (state.d1 || '') + (state.d6 || '') + '|' + state.deadline;
+    let s = p + '|' + JSON.stringify(m) + '|' + JSON.stringify(ui.overlay) + '|' + JSON.stringify(ui.call) + '|' + ui.pick + '|' + (state.d1 || '') + (state.d6 || '') + '|' + state.deadline;
     if (!m) s += JSON.stringify(names);
     if (m && (p === 'p1x' || p === 'p2x' || (m['l' + partOf()] && (p === 'p1' || p === 'p2')))) s += '|' + Object.keys(players).length;
     if (p === 'd1' || p === 'd6' || p === 'cfo') s += '|' + Object.keys(players).length;
@@ -192,6 +234,10 @@
     const bw = document.getElementById('borrow'); if (bw) bw.onclick = borrow;
     const lb = document.getElementById('lockb'); if (lb) lb.onclick = () => { ui.overlay = { t: 'lock' }; render(true); };
     const ly = document.getElementById('lockyes'); if (ly) ly.onclick = lock;
+    const ca = document.getElementById('cacc'); if (ca) { ca.onclick = acceptCall; startRing(); }
+    const cd = document.getElementById('cdecl'); if (cd) cd.onclick = () => { stopRing(); SFX.chip(); ui.call = { stage: 'mail' }; render(true); };
+    const ch = document.getElementById('chang'); if (ch) ch.onclick = endCall;
+    const cm = document.getElementById('cmail'); if (cm) cm.onclick = endCall;
     $app.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => { ui.overlay = null; render(true); }));
     const press = (el, tap, hold) => { let t, held = false;
       el.addEventListener('pointerdown', () => { held = false; t = setTimeout(() => { held = true; buzz(20); hold(); }, 430); });
@@ -216,7 +262,7 @@
       else if (e.f === 'dq') later(e.t, () => { SFX.stamp(); buzz([300]); later(0.5, () => SFX.sad()); });
       else if (e.f === 'ok') later(e.t, () => { SFX.stamp(); later(0.3, () => SFX.fanfare()); });
       else if (e.f === 'board-lb') later(e.t, () => SFX.chip());
-      else if (e.f === 'cfo') { later(0.2, () => SFX.drumroll(1.6)); later(e.t, () => { SFX.stamp(); later(0.6, () => SFX.fanfare()); }); }
+      else if (e.f === 'cfo') { [0.2, 2.8].forEach(t => later(t, () => SFX.ring())); later(e.t - 1.6, () => SFX.drumroll(1.5)); later(e.t, () => { SFX.stamp(); later(0.6, () => SFX.fanfare()); }); }
     });
   }
   function countUp() { $app.querySelectorAll('[data-count]').forEach(el => { const to = +el.dataset.count, t0 = performance.now(), D = 900;
@@ -258,11 +304,11 @@
     else if (p === 'd6') { const rows = L.map(x => ({ p: x, r: scoreOf(x) })).sort((a, b) => b.r.fin - a.r.fin).slice(0, 8), R = boardReveal(6);
       inner = `<div class="bh">Day 6 · <em>the sleepers wake up</em></div><div class="split"><div class="bincs">${R.cards}</div><div class="anim2" style="animation-delay:${R.lbAt}s"><div class="lbh">FINAL LEADERBOARD · BEFORE REVIEW</div><table class="lb">${lbRows(rows, 'fin')}</table></div></div>${R.intro}`; }
     else { const all = L.map(x => ({ p: x, r: scoreOf(x) })).sort((a, b) => b.r.fin - a.r.fin), ok = all.filter(x => !x.r.dq), dq = all.filter(x => x.r.dq);
-      const med = ['🥇', '🥈', '🥉']; if (!ui.seen.bcfo) { ui.seen.bcfo = true; ui.fx = [{ t: 2.0, f: 'cfo' }]; }
+      const med = ['🥇', '🥈', '🥉'], first = !ui.seen.bcfo; if (first) { ui.seen.bcfo = true; ui.fx = [{ t: 7.0, f: 'cfo' }]; }
       inner = `<div class="bh">Official leaderboard · <em>after CFO review</em></div><div class="cfo3">${ok.slice(0, 3).map((x, i) => `<div class="pod"><div class="m">${med[i]}</div><div class="n">${EMO[x.p.name] || ''} ${esc(x.p.name)}</div><div class="v">${x.r.fin}</div><div class="s">spent ${x.r.total} of ${G.TOTAL}</div></div>`).join('')}</div>
       <div class="split" style="grid-template-columns:1fr 1fr"><div><div class="lbh">ON BUDGET</div><table class="lb">${ok.slice(3, 9).map((x, i) => `<tr><td>${i + 4}</td><td>${EMO[x.p.name] || ''} ${esc(x.p.name)}</td><td class="s">spent ${x.r.total}</td><td>${x.r.fin}</td></tr>`).join('')}</table></div>
       <div><div class="lbh">DISQUALIFIED BY THE CFO · ${dq.length} PLAYERS</div><table class="lb">${dq.slice(0, 6).map(x => `<tr class="dq"><td>❌</td><td>${EMO[x.p.name] || ''} ${esc(x.p.name)}</td><td class="s">spent ${x.r.total}</td><td>${x.r.fin}</td></tr>`).join('')}</table>
-      ${dq.length ? `<div class="dqline">Top raw score: <b>${esc(dq[0].p.name)} ${dq[0].r.fin}</b>, spent ${dq[0].r.total} of ${G.TOTAL}. No budget, no bonus.</div>` : ''}</div></div><div class="stamp" style="animation-delay:2s">CFO REVIEW</div>`; }
+      ${dq.length ? `<div class="dqline">Top raw score: <b>${esc(dq[0].p.name)} ${dq[0].r.fin}</b>, spent ${dq[0].r.total} of ${G.TOTAL}. No budget, no bonus.</div>` : ''}</div></div><div class="stamp" style="animation-delay:${first ? 7 : 0}s">CFO REVIEW</div>${first ? `<div class="intro big bcall" style="animation-delay:5.2s"><div class="cl-av big">CFO</div><div class="ik">INCOMING CALL · NBD BANK</div><div class="iq">The CFO is calling every player…</div><div class="bsub" style="margin-top:2vh">Pick up your phone</div></div>` : ''}`; }
     return `<div class="bd"><div class="oval"></div><div class="bin">${inner}</div></div><button class="snd ${SFX.enabled ? 'on' : ''}" id="snd">${SFX.enabled ? '🔊' : '🔇 Click for sound'}</button>${DB.mode === 'demo' ? '<div class="demo">DEMO MODE</div>' : ''}`;
   }
   const boardSig = () => ph() + '|' + JSON.stringify(state) + '|' + (ph() === 'lobby' ? Object.values(players).map(x => x.name).join() : ['d1', 'd6', 'cfo'].includes(ph()) ? Object.keys(players).length : JSON.stringify(players));
