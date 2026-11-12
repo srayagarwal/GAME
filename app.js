@@ -54,7 +54,7 @@
     if (n >= c[6]) { toast('No more ' + c[2] + ' cards on the table'); return; }
     if (d.leftC < c[4]) { const bar = document.querySelector('.bar'); if (bar) { bar.classList.remove('shake'); void bar.offsetWidth; bar.classList.add('shake'); } toast('Not enough chips. Tap +10 to borrow from the bank.'); buzz([40, 40, 40]); return; }
     players[pid]['q' + d.part] = Object.assign({}, d.q, { [k]: n + 1 }); ui.pop = k; buzz(15);
-    DB.update(BASE + '/players/' + pid, { ['q' + d.part + '/' + k]: n + 1 }); render(true);
+    DB.update(BASE + '/players/' + pid, { ['q' + d.part + '/' + k]: n + 1 }); SFX.deal(); render(true);
   }
   function undeal(k) {
     const d = shopData(); const n = d.q[k] || 0; if (!n) return;
@@ -63,9 +63,9 @@
   }
   function borrow() {
     const d = shopData(); players[pid]['b' + d.part] = d.b + 10; buzz(25);
-    DB.update(BASE + '/players/' + pid, { ['b' + d.part]: d.b + 10 }); ui.overlay = { t: 'iou' }; render(true);
+    DB.update(BASE + '/players/' + pid, { ['b' + d.part]: d.b + 10 }); SFX.chip(); ui.overlay = { t: 'iou' }; render(true);
   }
-  function lock() { const part = partOf(); players[pid]['l' + part] = true; ui.overlay = null; DB.update(BASE + '/players/' + pid, { ['l' + part]: true }); buzz(60); render(true); }
+  function lock() { const part = partOf(); players[pid]['l' + part] = true; ui.overlay = null; DB.update(BASE + '/players/' + pid, { ['l' + part]: true }); buzz(60); SFX.stamp(); render(true); }
 
   function vJoin() {
     const taken = names;
@@ -109,7 +109,7 @@
   }
   function incRow(id, r, q1, q2, delay) {
     const [, e, name, , , ctrl] = G.INC[id]; const h = r.hits.find(x => x.id === id);
-    if (!h) return `<div class="inc down" style="animation-delay:${delay}s">FACE DOWN · DIDN’T HAPPEN</div>`;
+    if (!h) return `<div class="inc down" style="animation-delay:${delay}s"><div class="it"><span class="ie">${e}</span>${esc(name)}</div><div class="id">Not tonight. This one didn’t happen.</div></div>`;
     const lvl = h.v <= 0 ? 2 : Math.min(2, G.shield(id, G.full(q1, G.P1), G.full(q2, G.P2)));
     const mine = []; const add = (k, n) => { for (let i = 0; i < Math.min(n || 0, 2); i++) mine.push(k); };
     const c = G.CTRL[id]; if (c) add(c, (q1[c] !== undefined ? q1[c] : q2[c]));
@@ -122,22 +122,31 @@
   function vReveal(day) {
     const m = me(), r = scoreOf(m), q1 = m.q1 || {}, q2 = m.q2 || {};
     const ids = day === 1 ? ['JB', 'RUN', 'BIG', 'LEAK'] : ['S_EMAIL', 'S_AUDIT', 'FAIR', 'INV', 'DRIFT', 'DEEP'];
-    const key = 'rev' + day + ph(), anim = !ui.seen[key]; ui.seen[key] = true; if (anim) buzz([80, 60, 160]);
+    const key = 'rev' + day, anim = !ui.seen[key] && ph() !== 'cfo'; ui.seen[key] = true;
     const order = ids.slice().sort((a, b) => (r.hits.some(h => h.id === b) ? 1 : 0) - (r.hits.some(h => h.id === a) ? 1 : 0));
-    const rows = order.map((id, i) => incRow(id, r, q1, q2, anim ? 0.3 + i * 0.7 : 0)).join('');
-    const sd = anim ? 0.6 + ids.length * 0.7 : 0;
+    const INTRO = anim ? 3.4 : 0, STEP = 1.1, at0 = i => INTRO + 0.2 + i * STEP;
+    const rows = order.map((id, i) => incRow(id, r, q1, q2, anim ? at0(i) : 0)).join('');
+    const sd = anim ? at0(ids.length) + 0.2 : 0, score = day === 1 ? r.mid : r.fin;
+    if (anim) {
+      const fx = [{ t: 0, f: 'intro', day }];
+      order.forEach((id, i) => { const h = r.hits.find(x => x.id === id); const lvl = !h ? -1 : (h.v <= 0 ? 2 : Math.min(2, G.shield(id, G.full(q1, G.P1), G.full(q2, G.P2))));
+        fx.push({ t: at0(i), f: lvl < 0 ? 'none' : lvl >= 2 ? 'safe' : lvl === 1 ? 'half' : 'hit' }); });
+      fx.push({ t: sd, f: 'score', v: score }); ui.fx = fx;
+    }
+    const intro = anim ? `<div class="intro" style="animation-delay:${INTRO - 0.4}s"><div class="ik">${day === 1 ? 'DAY 1 · HOUR 6' : 'DAY 6'}</div><div class="iq">${day === 1 ? 'Nova goes live…' : 'Something wakes up…'}</div><div class="icd"><span>3</span><span>2</span><span>1</span></div></div><div class="flash"></div>` : '';
     if (day === 1) {
       const [rk, of] = rankOf('mid');
-      return table(`${topBar('DAY 1 · HOUR 6')}<div class="scroll"><div class="h2">Nova’s first night</div><div class="incs ${anim ? 'anim' : ''}">${rows}</div>
-        <div class="anim2" style="animation-delay:${sd}s"><div class="sc" style="margin-top:16px"><div class="scl">YOUR HOUR 6 SCORE</div><div class="scv">${r.mid}</div><div class="scr">Rank ${rk} of ${of}</div></div>
+      return table(`${topBar('DAY 1 · HOUR 6')}<div class="scroll"><div class="h2">Nova’s first night</div><div class="incs ${anim ? 'anim' : ''}">${rows}</div>${intro}
+        <div class="anim2" style="animation-delay:${sd}s"><div class="sc" style="margin-top:16px"><div class="scl">YOUR HOUR 6 SCORE</div><div class="scv" data-count="${r.mid}">${anim ? 0 : r.mid}</div><div class="scr">Rank ${rk} of ${of}</div></div>
         <div class="calc"><div><span>Revenue</span><b>${r.rev1}</b></div><div><span>Incident hits</span><b class="r">−${r.pen1}</b></div>${r.bust1 ? `<div><span>Over budget</span><b class="r">−${r.bust1}</b></div>` : ''}<div><span>Named owner</span><b>×${r.gov1}</b></div><div><span>Trust damage</span><b>÷${r.trust1}</b></div></div>
         <div class="tease">😴 Something from Day 1 is still asleep…</div></div></div>`);
     }
+    if (ph() === 'cfo' && !ui.seen.cfo) { ui.seen.cfo = true; ui.fx = [{ t: 0.4, f: r.dq ? 'dq' : 'ok' }]; }
     const fin = ph() === 'cfo', [rk, of] = fin ? rankOf('fin', p => !scoreOf(p).dq) : rankOf('fin');
-    const verdict = fin ? (r.dq ? `<div class="verdict bad"><b>❌ Disqualified by the CFO</b>You spent ${r.total} against an annual AI budget of ${G.TOTAL}. IOUs count.</div>`
-      : `<div class="verdict ok"><b>✓ CFO review: on budget</b>Spent ${r.total} of ${G.TOTAL}.</div>`) : '';
-    return table(`${topBar(fin ? 'CFO REVIEW' : 'DAY 6 · FINAL')}<div class="scroll"><div class="h2">The sleepers wake up</div><div class="incs ${anim ? 'anim' : ''}">${rows}</div>
-      <div class="anim2" style="animation-delay:${sd}s"><div class="sc" style="margin-top:16px"><div class="scl">FINAL SCORE</div><div class="scv">${r.fin}</div><div class="scr">${fin && r.dq ? 'Not ranked' : `Rank ${rk} of ${of}${fin ? ' on budget' : ''}`}</div></div>
+    const verdict = fin ? (r.dq ? `<div class="verdict bad vstamp"><b>❌ Disqualified by the CFO</b>You spent ${r.total} against an annual AI budget of ${G.TOTAL}. IOUs count.</div>`
+      : `<div class="verdict ok vstamp"><b>✓ CFO review: on budget</b>Spent ${r.total} of ${G.TOTAL}.</div>`) : '';
+    return table(`${topBar(fin ? 'CFO REVIEW' : 'DAY 6 · FINAL')}<div class="scroll"><div class="h2">The sleepers wake up</div><div class="incs ${anim ? 'anim' : ''}">${rows}</div>${intro}
+      <div class="anim2" style="animation-delay:${sd}s"><div class="sc" style="margin-top:16px"><div class="scl">FINAL SCORE</div><div class="scv" data-count="${r.fin}">${anim ? 0 : r.fin}</div><div class="scr">${fin && r.dq ? 'Not ranked' : `Rank ${rk} of ${of}${fin ? ' on budget' : ''}`}</div></div>
       <div class="calc"><div><span>Revenue</span><b>${r.rev}</b></div><div><span>Incident hits</span><b class="r">−${r.pen}</b></div>${r.bust ? `<div><span>Over budget</span><b class="r">−${r.bust}</b></div>` : ''}<div><span>Owner</span><b>×${r.gov}</b></div><div><span>AI literacy</span><b class="gtxt">+${r.lit}</b></div><div><span>Trust damage (${r.n} hits)</span><b>÷${r.trust}</b></div></div>
       ${verdict}${fin ? '' : '<div class="tease">Wait for the CFO…</div>'}</div></div>`);
   }
@@ -182,14 +191,47 @@
     $app.querySelectorAll('[data-hand] .pc').forEach(el => { const k = el.parentNode.dataset.hand; press(el, () => undeal(k), () => { ui.overlay = { t: 'flip', k }; render(true); }); });
   }
 
+  /* ---------- reveal effects: sounds, shake, flash, count-up ---------- */
+  function runFx(phone) {
+    const fx = ui.fx; ui.fx = null; if (!fx) return;
+    const root = $app.querySelector(phone ? '.ph' : '.bd');
+    const later = (t, fn) => setTimeout(fn, t * 1000);
+    fx.forEach(e => {
+      if (e.f === 'intro') { SFX.heartbeat(2, 0); SFX.drumroll(1.7, 1.6); buzz([60, 740, 60]); [0.0, 0.8, 1.6].forEach((t, i) => later(t + 0.05, () => SFX.tick())); }
+      else if (e.f === 'none') later(e.t, () => SFX.whoosh());
+      else if (e.f === 'hit') later(e.t, () => { SFX.flip(); later(0.2, () => { SFX.boom(); buzz([200, 60, 200]); if (root) { root.classList.remove('shake'); void root.offsetWidth; root.classList.add('shake'); const fl = $app.querySelector('.flash'); if (fl) { fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); } } }); });
+      else if (e.f === 'half') later(e.t, () => { SFX.flip(); later(0.2, () => { SFX.clang(); buzz(90); }); });
+      else if (e.f === 'safe') later(e.t, () => { SFX.flip(); later(0.2, () => { SFX.shield(); buzz(30); }); });
+      else if (e.f === 'score') later(e.t, () => { countUp(); const v = e.v; later(1.0, () => (v < 0 ? SFX.sad() : SFX.fanfare())); });
+      else if (e.f === 'dq') later(e.t, () => { SFX.stamp(); buzz([300]); later(0.5, () => SFX.sad()); });
+      else if (e.f === 'ok') later(e.t, () => { SFX.stamp(); later(0.3, () => SFX.fanfare()); });
+      else if (e.f === 'board-lb') later(e.t, () => SFX.chip());
+      else if (e.f === 'cfo') { later(0.2, () => SFX.drumroll(1.6)); later(e.t, () => { SFX.stamp(); later(0.6, () => SFX.fanfare()); }); }
+    });
+  }
+  function countUp() { $app.querySelectorAll('[data-count]').forEach(el => { const to = +el.dataset.count, t0 = performance.now(), D = 900;
+    const step = now => { const k = Math.min(1, (now - t0) / D); el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); }); }
+
   /* ======================= BOARD ======================= */
   const playerURL = () => location.origin + location.pathname + (ROOM !== (cfg.room || 'main') ? '?room=' + ROOM : '');
   function qrSVG(text) { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 8, margin: 0, scalable: true }); }
   function exposure(id) { let bl = 0, hf = 0, ex = 0; list().forEach(p => { const n = G.shield(id, G.full(p.q1, G.P1), G.full(p.q2, G.P2)); if (n >= 2) bl++; else if (n === 1) hf++; else ex++; }); return { bl, hf, ex }; }
-  function boardIncs(ids, on) {
-    return ids.map((id, i) => { const [, e, n] = G.INC[id];
-      if (on.indexOf(id) < 0) return `<div class="binc down" style="animation-delay:${i * .5}s"><div class="e">${e}</div><div class="bn">${esc(n)}</div><div class="bs">didn’t fire</div></div>`;
-      const x = exposure(id); return `<div class="binc" style="animation-delay:${i * .5}s"><div class="e">${e}</div><div class="bn">${esc(n)}</div><div class="bs">💥 ${x.ex} full hit · <span class="a">½ ${x.hf} halved</span> · <span class="g">🛡️ ${x.bl} blocked</span></div></div>`; }).join('');
+  function boardIncs(ids, on, anim, INTRO, STEP, fx) {
+    const order = ids.slice().sort((a, b) => (on.indexOf(b) >= 0) - (on.indexOf(a) >= 0));
+    const pos = id => order.indexOf(id), d = id => anim ? INTRO + 0.2 + pos(id) * STEP : 0;
+    if (anim) order.forEach(id => { const x = on.indexOf(id) >= 0 ? exposure(id) : null; fx.push({ t: d(id), f: !x ? 'none' : x.ex > 0 ? 'hit' : x.hf > 0 ? 'half' : 'safe' }); });
+    return ids.map(id => { const [, e, n] = G.INC[id];
+      if (on.indexOf(id) < 0) return `<div class="binc down" style="animation-delay:${d(id)}s"><div class="e">${e}</div><div class="bn">${esc(n)}</div><div class="bs">not tonight</div></div>`;
+      const x = exposure(id); return `<div class="binc ${x.ex > 0 ? 'hot' : ''}" style="animation-delay:${d(id)}s"><div class="e">${e}</div><div class="bn">${esc(n)}</div><div class="bs">💥 ${x.ex} full hit · <span class="a">½ ${x.hf} halved</span> · <span class="g">🛡️ ${x.bl} blocked</span></div></div>`; }).join('');
+  }
+  function boardReveal(day) {
+    const key = 'brev' + day, anim = !ui.seen[key]; ui.seen[key] = true;
+    const INTRO = anim ? 3.4 : 0, STEP = 1.1, ids = day === 1 ? ['JB', 'RUN', 'BIG', 'LEAK'] : ['S_EMAIL', 'S_AUDIT', 'FAIR', 'INV', 'DRIFT', 'DEEP'];
+    const fx = anim ? [{ t: 0, f: 'intro', day }] : [];
+    const cards = boardIncs(ids, (day === 1 ? state.d1 : state.d6) || [], anim, INTRO, STEP, fx);
+    const lbAt = anim ? INTRO + 0.2 + ids.length * STEP + 0.3 : 0; if (anim) { fx.push({ t: lbAt, f: 'board-lb' }); ui.fx = fx; }
+    const intro = anim ? `<div class="intro big" style="animation-delay:${INTRO - 0.4}s"><div class="ik">${day === 1 ? 'DAY 1 · HOUR 6' : 'DAY 6'}</div><div class="iq">${day === 1 ? 'Nova goes live…' : 'Something wakes up…'}</div><div class="icd"><span>3</span><span>2</span><span>1</span></div></div><div class="flash"></div>` : '';
+    return { cards, intro, lbAt };
   }
   function lbRows(rows, key, strike) { return rows.map((x, i) => `<tr class="${strike && x.r.dq ? 'dq' : ''} ${!strike && i < 3 ? 'pod' : ''}"><td>${i + 1}</td><td>${EMO[x.p.name] || ''} ${esc(x.p.name)}</td><td class="s">${at('d6') ? 'spent ' + x.r.total : ''}</td><td>${x.r[key]}</td></tr>`).join(''); }
   function boardView() {
@@ -201,19 +243,19 @@
       inner = `<div class="bh">Part ${part} · <em>${closed ? 'the shop is closed' : 'the shop is open'}</em></div><div class="bshop">${p === 'p1' ? `<div class="qrb" style="padding:1.4vh">${qrSVG(url).replace('<svg', '<svg style="width:26vh;height:26vh"')}</div>` : ''}
       <div>${!closed && t != null ? `<div class="bcd cdi">${fmtT(t)}</div>` : `<div class="bcd" style="font-size:12vh">🔒</div>`}<div class="bcount"><b id="bn">${n}</b> of ${L.length} hands locked</div><div class="bprog"><i style="width:${L.length ? 100 * n / L.length : 0}%"></i></div>
       <div class="bsub" style="margin:1vh 0 0">${part === '1' ? 'Budget: 100 chips' : 'Budget: 80 chips'} · borrowing is allowed</div></div></div>`; }
-    else if (p === 'd1') { const rows = L.map(x => ({ p: x, r: scoreOf(x) })).sort((a, b) => b.r.mid - a.r.mid).slice(0, 8);
-      inner = `<div class="bh">Day 1 · <em>Nova’s first night</em></div><div class="split"><div class="bincs four">${boardIncs(['JB', 'RUN', 'BIG', 'LEAK'], state.d1 || [])}</div><div><div class="lbh">HOUR 6 LEADERBOARD</div><table class="lb">${lbRows(rows, 'mid')}</table></div></div>`; }
-    else if (p === 'd6') { const rows = L.map(x => ({ p: x, r: scoreOf(x) })).sort((a, b) => b.r.fin - a.r.fin).slice(0, 8);
-      inner = `<div class="bh">Day 6 · <em>the sleepers wake up</em></div><div class="split"><div class="bincs">${boardIncs(['S_EMAIL', 'S_AUDIT', 'FAIR', 'INV', 'DRIFT', 'DEEP'], state.d6 || [])}</div><div><div class="lbh">FINAL LEADERBOARD · BEFORE REVIEW</div><table class="lb">${lbRows(rows, 'fin')}</table></div></div>`; }
+    else if (p === 'd1') { const rows = L.map(x => ({ p: x, r: scoreOf(x) })).sort((a, b) => b.r.mid - a.r.mid).slice(0, 8), R = boardReveal(1);
+      inner = `<div class="bh">Day 1 · <em>Nova’s first night</em></div><div class="split"><div class="bincs four">${R.cards}</div><div class="anim2" style="animation-delay:${R.lbAt}s"><div class="lbh">HOUR 6 LEADERBOARD</div><table class="lb">${lbRows(rows, 'mid')}</table></div></div>${R.intro}`; }
+    else if (p === 'd6') { const rows = L.map(x => ({ p: x, r: scoreOf(x) })).sort((a, b) => b.r.fin - a.r.fin).slice(0, 8), R = boardReveal(6);
+      inner = `<div class="bh">Day 6 · <em>the sleepers wake up</em></div><div class="split"><div class="bincs">${R.cards}</div><div class="anim2" style="animation-delay:${R.lbAt}s"><div class="lbh">FINAL LEADERBOARD · BEFORE REVIEW</div><table class="lb">${lbRows(rows, 'fin')}</table></div></div>${R.intro}`; }
     else { const all = L.map(x => ({ p: x, r: scoreOf(x) })).sort((a, b) => b.r.fin - a.r.fin), ok = all.filter(x => !x.r.dq), dq = all.filter(x => x.r.dq);
-      const med = ['🥇', '🥈', '🥉'];
+      const med = ['🥇', '🥈', '🥉']; if (!ui.seen.bcfo) { ui.seen.bcfo = true; ui.fx = [{ t: 2.0, f: 'cfo' }]; }
       inner = `<div class="bh">Official leaderboard · <em>after CFO review</em></div><div class="cfo3">${ok.slice(0, 3).map((x, i) => `<div class="pod"><div class="m">${med[i]}</div><div class="n">${EMO[x.p.name] || ''} ${esc(x.p.name)}</div><div class="v">${x.r.fin}</div><div class="s">spent ${x.r.total} of ${G.TOTAL}</div></div>`).join('')}</div>
       <div class="split" style="grid-template-columns:1fr 1fr"><div><div class="lbh">ON BUDGET</div><table class="lb">${ok.slice(3, 9).map((x, i) => `<tr><td>${i + 4}</td><td>${EMO[x.p.name] || ''} ${esc(x.p.name)}</td><td class="s">spent ${x.r.total}</td><td>${x.r.fin}</td></tr>`).join('')}</table></div>
       <div><div class="lbh">DISQUALIFIED BY THE CFO · ${dq.length} PLAYERS</div><table class="lb">${dq.slice(0, 6).map(x => `<tr class="dq"><td>❌</td><td>${EMO[x.p.name] || ''} ${esc(x.p.name)}</td><td class="s">spent ${x.r.total}</td><td>${x.r.fin}</td></tr>`).join('')}</table>
-      ${dq.length ? `<div class="dqline">Top raw score: <b>${esc(dq[0].p.name)} ${dq[0].r.fin}</b>, spent ${dq[0].r.total} of ${G.TOTAL}. No budget, no bonus.</div>` : ''}</div></div><div class="stamp">CFO REVIEW</div>`; }
-    return `<div class="bd"><div class="oval"></div><div class="bin">${inner}</div></div>${DB.mode === 'demo' ? '<div class="demo">DEMO MODE</div>' : ''}`;
+      ${dq.length ? `<div class="dqline">Top raw score: <b>${esc(dq[0].p.name)} ${dq[0].r.fin}</b>, spent ${dq[0].r.total} of ${G.TOTAL}. No budget, no bonus.</div>` : ''}</div></div><div class="stamp" style="animation-delay:2s">CFO REVIEW</div>`; }
+    return `<div class="bd"><div class="oval"></div><div class="bin">${inner}</div></div><button class="snd ${SFX.enabled ? 'on' : ''}" id="snd">${SFX.enabled ? '🔊' : '🔇 Click for sound'}</button>${DB.mode === 'demo' ? '<div class="demo">DEMO MODE</div>' : ''}`;
   }
-  const boardSig = () => ph() + '|' + JSON.stringify(state) + '|' + (['lobby'].includes(ph()) ? Object.values(players).map(x => x.name).join() : JSON.stringify(players));
+  const boardSig = () => ph() + '|' + JSON.stringify(state) + '|' + (ph() === 'lobby' ? Object.values(players).map(x => x.name).join() : ['d1', 'd6', 'cfo'].includes(ph()) ? Object.keys(players).length : JSON.stringify(players));
 
   /* ======================= HOST ======================= */
   const STEPS = [['Open Part 1', 'lobby', 'p1'], ['Close Part 1', 'p1', 'p1x'], ['Reveal Day 1', 'p1x', 'd1'], ['Open Part 2', 'd1', 'p2'], ['Close Part 2', 'p2', 'p2x'], ['Reveal Day 6', 'p2x', 'd6'], ['CFO review', 'd6', 'cfo']];
@@ -273,8 +315,9 @@
     const keepMins = document.getElementById('mins') && document.getElementById('mins').value;
     if (VIEW === 'player') { $app.innerHTML = playerView() + overlayHTML(); bindPlayer(); ui.pop = null;
       const a2 = $app.querySelector('.anim2'), sc = $app.querySelector('.scroll');
-      if (a2 && sc) { const d = parseFloat(a2.style.animationDelay) || 0; setTimeout(() => sc.scrollTo({ top: a2.offsetTop - 60, behavior: d ? 'smooth' : 'auto' }), d * 1000 + 200); } }
-    else if (VIEW === 'board') $app.innerHTML = boardView();
+      if (a2 && sc) { const d = parseFloat(a2.style.animationDelay) || 0; setTimeout(() => sc.scrollTo({ top: a2.offsetTop - 60, behavior: d ? 'smooth' : 'auto' }), d * 1000 + 200); }
+      runFx(true); }
+    else if (VIEW === 'board') { $app.innerHTML = boardView(); const sb = document.getElementById('snd'); if (sb) sb.onclick = () => { SFX.unlock(); setTimeout(() => { SFX.fanfare(); render(true); }, 150); }; runFx(false); }
     else { $app.innerHTML = hostView(); if (keepMins) document.getElementById('mins').value = keepMins; bindHost(); }
   }
   setInterval(() => { const t = left(); if (t == null) return; document.querySelectorAll('.cdi').forEach(el => el.textContent = fmtT(t)); }, 500);

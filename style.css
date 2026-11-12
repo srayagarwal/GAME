@@ -139,3 +139,25 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .bh{font-size:6vh}
 .stamp{top:auto;bottom:9vh;right:9vw}
 html.sm .fx{display:none}html.sm .nm{font-size:10px}
+/* ---- dramatic reveal ---- */
+.inc.down{height:auto;min-height:0;padding:9px 13px;background:rgba(0,0,0,.12);border:1.5px dashed rgba(255,255,255,.22);display:block;opacity:.6;color:var(--text);font-size:inherit;letter-spacing:0}
+.inc.down .it{font-size:14.5px}.inc.down .id{font-size:12px}
+.intro{position:fixed;inset:0;z-index:150;background:radial-gradient(circle at 50% 45%,rgba(20,8,30,.92),rgba(5,6,16,.98));display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;animation:introout .45s ease-in both;pointer-events:none}
+@keyframes introout{to{opacity:0;visibility:hidden}}
+.intro .ik{font-size:13px;font-weight:800;letter-spacing:3px;color:var(--coral)}
+.intro .iq{font-family:Fraunces;font-weight:800;font-style:italic;font-size:34px;margin:10px 0 24px;animation:pulse 0.8s ease-in-out infinite alternate}
+@keyframes pulse{from{opacity:.55;transform:scale(.97)}to{opacity:1;transform:scale(1.03)}}
+.intro .icd{position:relative;width:160px;height:160px}.intro .icd span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:Fraunces;font-weight:800;font-size:130px;color:var(--gold);opacity:0;animation:cd .8s ease-out both}
+.intro .icd span:nth-child(1){animation-delay:0s}.intro .icd span:nth-child(2){animation-delay:.8s}.intro .icd span:nth-child(3){animation-delay:1.6s;animation-duration:1.6s}
+@keyframes cd{0%{opacity:0;transform:scale(2.2)}25%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(.6)}}
+.intro.big .ik{font-size:2.6vh;letter-spacing:.6vh}.intro.big .iq{font-size:8vh}.intro.big .icd{width:30vh;height:30vh}.intro.big .icd span{font-size:26vh}
+.flash{position:fixed;inset:0;background:radial-gradient(circle,rgba(255,60,80,.55),rgba(255,20,50,.15));z-index:140;opacity:0;pointer-events:none}
+.flash.go{animation:flash .6s ease-out}@keyframes flash{0%{opacity:1}100%{opacity:0}}
+.shake{animation:bigshake .5s}@keyframes bigshake{10%,90%{transform:translate(-2px,1px)}20%,80%{transform:translate(5px,-3px)}30%,50%,70%{transform:translate(-8px,4px)}40%,60%{transform:translate(8px,-4px)}}
+.anim .inc{animation:dealflip .7s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes dealflip{0%{opacity:0;transform:perspective(600px) translateY(-40px) rotateY(180deg) scale(.8)}60%{opacity:1}100%{opacity:1;transform:perspective(600px) rotateY(0) scale(1)}}
+.binc{animation:dealflip .8s cubic-bezier(.2,1.4,.4,1) both}
+.binc.hot{box-shadow:0 0 0 .4vh var(--coral),0 0 4vh rgba(255,93,115,.6)}
+.binc.down{opacity:.5}
+.vstamp{animation:vst .5s cubic-bezier(.2,1.6,.4,1) .4s both}@keyframes vst{from{opacity:0;transform:scale(1.8) rotate(-6deg)}}
+.snd{position:fixed;right:2vw;top:2vh;z-index:200;background:rgba(0,0,0,.45);border:1px solid var(--line);border-radius:12px;padding:8px 14px;font-weight:800;font-size:15px;color:var(--text)}.snd.on{opacity:.5}
