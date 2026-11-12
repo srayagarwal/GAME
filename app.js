@@ -119,6 +119,16 @@
     return `<div class="inc ${cls}" style="animation-delay:${delay}s"><div class="it"><span class="ie">${e}</span>${esc(name)}</div><div class="id">${txt}</div>${mine.length ? `<div class="mc">${mine.slice(0, 3).map(k => cardHTML(k)).join('')}</div>` : ''}</div>`;
   }
   function rankOf(key, filt) { const L = list().filter(filt || (() => true)).map(p => [p.id, scoreOf(p)[key]]).sort((a, b) => b[1] - a[1]); return [L.findIndex(x => x[0] === pid) + 1, L.length]; }
+  function miniBoard(key, title, cfoMode) {
+    const all = list().map(p => ({ p, r: scoreOf(p) })).sort((a, b) => b.r[key] - a.r[key]);
+    const rows = cfoMode ? all.filter(x => !x.r.dq).concat(all.filter(x => x.r.dq)) : all;
+    const mine = rows.findIndex(x => x.p.id === pid), show = rows.slice(0, 5);
+    if (mine >= 5) show.push(null, rows[mine]);
+    const med = ['🥇', '🥈', '🥉'];
+    const tr = (x, i) => { if (!x) return '<div class="mbr gap">⋯</div>'; const idx = rows.indexOf(x), dq = cfoMode && x.r.dq;
+      return `<div class="mbr ${x.p.id === pid ? 'me' : ''} ${dq ? 'dq' : ''}"><span class="rk">${dq ? '❌' : (idx < 3 ? med[idx] : idx + 1)}</span><span class="nmb">${EMO[x.p.name] || ''} ${esc(x.p.name)}${x.p.id === pid ? ' · you' : ''}</span><b>${x.r[key]}</b></div>`; };
+    return `<div class="mb"><div class="mbh">${title}</div>${show.map(tr).join('')}</div>`;
+  }
   function vReveal(day) {
     const m = me(), r = scoreOf(m), q1 = m.q1 || {}, q2 = m.q2 || {};
     const ids = day === 1 ? ['JB', 'RUN', 'BIG', 'LEAK'] : ['S_EMAIL', 'S_AUDIT', 'FAIR', 'INV', 'DRIFT', 'DEEP'];
@@ -139,7 +149,7 @@
       return table(`${topBar('DAY 1 · HOUR 6')}<div class="scroll"><div class="h2">Nova’s first night</div><div class="incs ${anim ? 'anim' : ''}">${rows}</div>${intro}
         <div class="anim2" style="animation-delay:${sd}s"><div class="sc" style="margin-top:16px"><div class="scl">YOUR HOUR 6 SCORE</div><div class="scv" data-count="${r.mid}">${anim ? 0 : r.mid}</div><div class="scr">Rank ${rk} of ${of}</div></div>
         <div class="calc"><div><span>Revenue</span><b>${r.rev1}</b></div><div><span>Incident hits</span><b class="r">−${r.pen1}</b></div>${r.bust1 ? `<div><span>Over budget</span><b class="r">−${r.bust1}</b></div>` : ''}<div><span>Named owner</span><b>×${r.gov1}</b></div><div><span>Trust damage</span><b>÷${r.trust1}</b></div></div>
-        <div class="tease">😴 Something from Day 1 is still asleep…</div></div></div>`);
+        ${miniBoard('mid', 'HOUR 6 LEADERBOARD')}<div class="tease">😴 Something from Day 1 is still asleep…</div></div></div>`);
     }
     if (ph() === 'cfo' && !ui.seen.cfo) { ui.seen.cfo = true; ui.fx = [{ t: 0.4, f: r.dq ? 'dq' : 'ok' }]; }
     const fin = ph() === 'cfo', [rk, of] = fin ? rankOf('fin', p => !scoreOf(p).dq) : rankOf('fin');
@@ -148,7 +158,7 @@
     return table(`${topBar(fin ? 'CFO REVIEW' : 'DAY 6 · FINAL')}<div class="scroll"><div class="h2">The sleepers wake up</div><div class="incs ${anim ? 'anim' : ''}">${rows}</div>${intro}
       <div class="anim2" style="animation-delay:${sd}s"><div class="sc" style="margin-top:16px"><div class="scl">FINAL SCORE</div><div class="scv" data-count="${r.fin}">${anim ? 0 : r.fin}</div><div class="scr">${fin && r.dq ? 'Not ranked' : `Rank ${rk} of ${of}${fin ? ' on budget' : ''}`}</div></div>
       <div class="calc"><div><span>Revenue</span><b>${r.rev}</b></div><div><span>Incident hits</span><b class="r">−${r.pen}</b></div>${r.bust ? `<div><span>Over budget</span><b class="r">−${r.bust}</b></div>` : ''}<div><span>Owner</span><b>×${r.gov}</b></div><div><span>AI literacy</span><b class="gtxt">+${r.lit}</b></div><div><span>Trust damage (${r.n} hits)</span><b>÷${r.trust}</b></div></div>
-      ${verdict}${fin ? '' : '<div class="tease">Wait for the CFO…</div>'}</div></div>`);
+      ${verdict}${fin ? miniBoard('fin', 'OFFICIAL LEADERBOARD · AFTER CFO REVIEW', true) : miniBoard('fin', 'LEADERBOARD · BEFORE CFO REVIEW')}${fin ? '' : '<div class="tease">Wait for the CFO…</div>'}</div></div>`);
   }
   function overlayHTML() {
     const o = ui.overlay; if (!o) return '';

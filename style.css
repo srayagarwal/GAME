@@ -161,3 +161,10 @@ html.sm .fx{display:none}html.sm .nm{font-size:10px}
 .binc.down{opacity:.5}
 .vstamp{animation:vst .5s cubic-bezier(.2,1.6,.4,1) .4s both}@keyframes vst{from{opacity:0;transform:scale(1.8) rotate(-6deg)}}
 .snd{position:fixed;right:2vw;top:2vh;z-index:200;background:rgba(0,0,0,.45);border:1px solid var(--line);border-radius:12px;padding:8px 14px;font-weight:800;font-size:15px;color:var(--text)}.snd.on{opacity:.5}
+/* phone mini leaderboard */
+.mb{margin-top:14px;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:16px;padding:10px 12px;position:relative;z-index:2}
+.mbh{font-size:10.5px;font-weight:800;letter-spacing:1.3px;color:var(--lav);margin:2px 2px 8px}
+.mbr{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:10px;font-size:14.5px;font-weight:700}
+.mbr .rk{width:26px;text-align:center;color:var(--lav)}.mbr .nmb{flex:1}.mbr b{font-family:Fraunces;font-weight:800;font-size:17px;color:var(--gold)}
+.mbr.me{background:rgba(242,193,78,.18);outline:1.5px solid var(--gold)}.mbr.dq{opacity:.45;text-decoration:line-through;text-decoration-color:var(--coral)}
+.mbr.gap{justify-content:center;color:var(--lav);padding:0}
