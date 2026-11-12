@@ -193,3 +193,15 @@ html.sm .fx{display:none}html.sm .nm{font-size:10px}
 .mvb{font-size:15.5px;line-height:1.55;color:#222;flex:1}.mvb p{margin-bottom:10px}.mvb .sig{color:#8a8a93;font-style:italic}
 .mailv .btn{margin-top:14px}
 .bcall{animation-duration:.5s}.bcall .cl-av.big{width:22vh;height:22vh;font-size:7vh;margin-bottom:3vh;animation:ringpulse 1.3s infinite}
+/* phone-only play: room stats, lobby list, CFO podium */
+.room{font-size:11.5px;font-weight:600;color:var(--lav);margin-top:5px;padding-top:5px;border-top:1px dashed rgba(255,255,255,.15)}
+.room b{font-weight:800}.room .r{color:var(--coral)}.room .a{color:var(--gold)}.room .g{color:var(--mint)}
+.lobby{margin-top:22px;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:16px;padding:12px;max-height:38vh;overflow-y:auto}
+.lbh2{font-size:10.5px;font-weight:800;letter-spacing:1.3px;color:var(--lav);margin-bottom:8px}
+.lobn span{display:inline-block;background:rgba(255,255,255,.08);border-radius:10px;padding:5px 9px;margin:3px;font-size:13px;font-weight:700;animation:fade .4s}.lobn span.me{background:var(--gold);color:var(--ink)}
+.pod3{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:8px}
+.pp{background:rgba(242,193,78,.12);border:1.5px solid var(--gold);border-radius:12px;padding:8px 4px;text-align:center}
+.pp .m{font-size:24px}.pp .n{font-size:12.5px;font-weight:800;line-height:1.2;margin-top:2px;word-break:break-word}.pp .v{font-family:Fraunces;font-weight:800;font-size:24px;color:var(--gold);line-height:1.1}.pp .s{font-size:10.5px;color:var(--lav);font-weight:700}
+.pp.me{background:rgba(242,193,78,.3)}
+.dqb{border-color:rgba(255,93,115,.4)}.mbr.dq2 .nmb{text-decoration:line-through;text-decoration-color:var(--coral);opacity:.7}.mbr.dq2 small{font-size:11px;color:var(--lav);font-weight:700}.mbr.dq2 b{opacity:.6}
+.dqn{font-size:12.5px;font-weight:600;color:var(--lav);margin:8px 4px 2px;line-height:1.4}.dqn b{color:var(--coral)}

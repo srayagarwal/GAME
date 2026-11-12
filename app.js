@@ -116,7 +116,7 @@
     if (id === 'S_EMAIL') { add('PE', q1.PE); add('LPE', q2.LPE); } if (id === 'S_AUDIT') { add('AU', q1.AU); add('GO', q1.GO ? 1 : 0); add('LGO', q2.LGO); add('LAU', q2.LAU); }
     const cls = lvl >= 2 ? 'safe' : lvl === 1 ? 'half' : 'hit';
     const txt = lvl >= 2 ? `Your cards stopped it. <b>Blocked</b>` : lvl === 1 ? `Your card caught part of it. Halved: <b>−${h.v}</b>` : `Nothing stopped it (${esc(ctrl)}). Full hit: <b>−${h.v}</b>`;
-    return `<div class="inc ${cls}" style="animation-delay:${delay}s"><div class="it"><span class="ie">${e}</span>${esc(name)}</div><div class="id">${txt}</div>${mine.length ? `<div class="mc">${mine.slice(0, 3).map(k => cardHTML(k)).join('')}</div>` : ''}</div>`;
+    return `<div class="inc ${cls}" style="animation-delay:${delay}s"><div class="it"><span class="ie">${e}</span>${esc(name)}</div><div class="id">${txt}</div>${(() => { const x = exposure(id); return `<div class="room">Room: <b class="r">💥 ${x.ex} hit</b> · <b class="a">½ ${x.hf} halved</b> · <b class="g">🛡️ ${x.bl} blocked</b></div>`; })()}${mine.length ? `<div class="mc">${mine.slice(0, 3).map(k => cardHTML(k)).join('')}</div>` : ''}</div>`;
   }
   function rankOf(key, filt) { const L = list().filter(filt || (() => true)).map(p => [p.id, scoreOf(p)[key]]).sort((a, b) => b[1] - a[1]); return [L.findIndex(x => x[0] === pid) + 1, L.length]; }
   function miniBoard(key, title, cfoMode) {
@@ -128,6 +128,19 @@
     const tr = (x, i) => { if (!x) return '<div class="mbr gap">⋯</div>'; const idx = rows.indexOf(x), dq = cfoMode && x.r.dq;
       return `<div class="mbr ${x.p.id === pid ? 'me' : ''} ${dq ? 'dq' : ''}"><span class="rk">${dq ? '❌' : (idx < 3 ? med[idx] : idx + 1)}</span><span class="nmb">${EMO[x.p.name] || ''} ${esc(x.p.name)}${x.p.id === pid ? ' · you' : ''}</span><b>${x.r[key]}</b></div>`; };
     return `<div class="mb"><div class="mbh">${title}</div>${show.map(tr).join('')}</div>`;
+  }
+  function cfoBoard() {
+    const all = list().map(p => ({ p, r: scoreOf(p) })).sort((a, b) => b.r.fin - a.r.fin), ok = all.filter(x => !x.r.dq), dq = all.filter(x => x.r.dq);
+    const med = ['🥇', '🥈', '🥉'], me_ = x => x.p.id === pid ? ' me' : '', nm = x => `${EMO[x.p.name] || ''} ${esc(x.p.name)}${x.p.id === pid ? ' · you' : ''}`;
+    const pod = ok.slice(0, 3).map((x, i) => `<div class="pp${me_(x)}"><div class="m">${med[i]}</div><div class="n">${nm(x)}</div><div class="v">${x.r.fin}</div><div class="s">spent ${x.r.total}</div></div>`).join('');
+    const mi = ok.findIndex(x => x.p.id === pid), rest = ok.slice(3, 8).map((x, i) => [x, i + 4]);
+    if (mi >= 8) rest.push(null, [ok[mi], mi + 1]);
+    const rows = rest.map(e => !e ? '<div class="mbr gap">⋯</div>' : `<div class="mbr${me_(e[0])}"><span class="rk">${e[1]}</span><span class="nmb">${nm(e[0])}</span><b>${e[0].r.fin}</b></div>`).join('');
+    const dqi = dq.findIndex(x => x.p.id === pid), dshow = dq.slice(0, 6); if (dqi >= 6) dshow.push(dq[dqi]);
+    const drows = dshow.map(x => `<div class="mbr dq2${me_(x)}"><span class="rk">❌</span><span class="nmb">${nm(x)}</span><small>spent ${x.r.total}</small><b>${x.r.fin}</b></div>`).join('');
+    return `<div class="mb"><div class="mbh">OFFICIAL LEADERBOARD · AFTER CFO REVIEW</div>${ok.length ? `<div class="pod3">${pod}</div>` : ''}${rows}</div>
+      ${dq.length ? `<div class="mb dqb"><div class="mbh">DISQUALIFIED BY THE CFO · ${dq.length} PLAYER${dq.length > 1 ? 'S' : ''}</div>${drows}${dq.length > dshow.length ? `<div class="mbr gap">+ ${dq.length - dshow.length} more</div>` : ''}
+      <div class="dqn">Top raw score: <b>${esc(dq[0].p.name)} ${dq[0].r.fin}</b>, spent ${dq[0].r.total} of ${G.TOTAL}. No budget, no bonus.</div></div>` : ''}`;
   }
   function vReveal(day) {
     const m = me(), r = scoreOf(m), q1 = m.q1 || {}, q2 = m.q2 || {};
@@ -158,7 +171,7 @@
     return table(`${topBar(fin ? 'CFO REVIEW' : 'DAY 6 · FINAL')}<div class="scroll"><div class="h2">The sleepers wake up</div><div class="incs ${anim ? 'anim' : ''}">${rows}</div>${intro}
       <div class="anim2" style="animation-delay:${sd}s"><div class="sc" style="margin-top:16px"><div class="scl">FINAL SCORE</div><div class="scv" data-count="${r.fin}">${anim ? 0 : r.fin}</div><div class="scr">${fin && r.dq ? 'Not ranked' : `Rank ${rk} of ${of}${fin ? ' on budget' : ''}`}</div></div>
       <div class="calc"><div><span>Revenue</span><b>${r.rev}</b></div><div><span>Incident hits</span><b class="r">−${r.pen}</b></div>${r.bust ? `<div><span>Over budget</span><b class="r">−${r.bust}</b></div>` : ''}<div><span>Owner</span><b>×${r.gov}</b></div><div><span>AI literacy</span><b class="gtxt">+${r.lit}</b></div><div><span>Trust damage (${r.n} hits)</span><b>÷${r.trust}</b></div></div>
-      ${verdict}${fin ? miniBoard('fin', 'OFFICIAL LEADERBOARD · AFTER CFO REVIEW', true) : miniBoard('fin', 'LEADERBOARD · BEFORE CFO REVIEW')}${fin ? '' : '<div class="tease">Wait for the CFO…</div>'}</div></div>`);
+      ${verdict}${fin ? cfoBoard() : miniBoard('fin', 'LEADERBOARD · BEFORE CFO REVIEW')}${fin ? '' : '<div class="tease">Wait for the CFO…</div>'}</div></div>`);
   }
   function overlayHTML() {
     const o = ui.overlay; if (!o) return '';
@@ -171,7 +184,8 @@
   function playerView() {
     const m = me(), p = ph();
     if (!m) return (p === 'lobby' || p === 'p1') ? vJoin() : vClosed('The game has already started.<br>Watch the big screen: you can join the next one.');
-    if (p === 'lobby') return table(`${topBar('LOBBY')}<div class="mid"><div class="lk">${EMO[m.name] || '🙂'}</div><div class="lt">You’re in, ${esc(m.name)}</div><div class="ls">Keep this page open.<br>The shop opens when the host is ready.</div></div>`);
+    if (p === 'lobby') return table(`${topBar('LOBBY')}<div class="mid"><div class="lk">${EMO[m.name] || '🙂'}</div><div class="lt">You’re in, ${esc(m.name)}</div><div class="ls">Keep this page open.<br>The shop opens when the host is ready.</div>
+      <div class="lobby"><div class="lbh2">${list().length} PLAYERS AT THE TABLE</div><div class="lobn">${list().map(x => `<span class="${x.id === pid ? 'me' : ''}">${EMO[x.name] || ''} ${esc(x.name)}</span>`).join('')}</div></div></div>`);
     if (p === 'p1' || p === 'p2') return m['l' + partOf()] ? vLocked(false) : vShop();
     if (p === 'p1x' || p === 'p2x') return vLocked(true);
     if (p === 'd1') return vReveal(1);
@@ -223,6 +237,7 @@
     const m = me(), p = ph();
     let s = p + '|' + JSON.stringify(m) + '|' + JSON.stringify(ui.overlay) + '|' + JSON.stringify(ui.call) + '|' + ui.pick + '|' + (state.d1 || '') + (state.d6 || '') + '|' + state.deadline;
     if (!m) s += JSON.stringify(names);
+    if (p === 'lobby') s += '|' + list().map(x => x.name).join();
     if (m && (p === 'p1x' || p === 'p2x' || (m['l' + partOf()] && (p === 'p1' || p === 'p2')))) s += '|' + Object.keys(players).length;
     if (p === 'd1' || p === 'd6' || p === 'cfo') s += '|' + Object.keys(players).length;
     return s;
