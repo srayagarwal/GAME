@@ -205,3 +205,5 @@ html.sm .fx{display:none}html.sm .nm{font-size:10px}
 .pp.me{background:rgba(242,193,78,.3)}
 .dqb{border-color:rgba(255,93,115,.4)}.mbr.dq2 .nmb{text-decoration:line-through;text-decoration-color:var(--coral);opacity:.7}.mbr.dq2 small{font-size:11px;color:var(--lav);font-weight:700}.mbr.dq2 b{opacity:.6}
 .dqn{font-size:12.5px;font-weight:600;color:var(--lav);margin:8px 4px 2px;line-height:1.4}.dqn b{color:var(--coral)}
+
+.nmin{width:100%;box-sizing:border-box;background:rgba(0,0,0,.28);border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 14px;font-family:inherit;font-weight:700;font-size:17px;color:var(--text);position:relative;z-index:2;outline:none}.nmin:focus{border-color:var(--gold)}.nmin::placeholder{color:var(--lav);opacity:.7;font-weight:600}

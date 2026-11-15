@@ -8,7 +8,11 @@
     ['Lion','🦁'],['Lock','🔒'],['Moon','🌙'],['Ninja','🥷'],['Nova','✨'],['Orbit','🪐'],['Owl','🦉'],['Owner','👑'],['Panda','🐼'],['Pilot','🧑‍✈️'],
     ['Pixel','👾'],['Proof','📜'],['Radar','📡'],['Ranger','🤠'],['Robot','🤖'],['Rocket','🚀'],['Safe','🦺'],['Shark','🦈'],['Shield','🛡️'],['Sky','☁️'],
     ['Spark','⚡'],['Star','⭐'],['Sun','☀️'],['Test','🧪'],['Tiger','🐯'],['Trust','🤝'],['Truth','🔍'],['Watch','⌚'],['Wolf','🐺'],['Zebra','🦓']];
-  const EMO = {}; NAMES.forEach(([n, e]) => EMO[n] = e);
+  const EMO0 = {}; NAMES.forEach(([n, e]) => EMO0[n] = e);
+  const EMO = new Proxy(EMO0, { get: (t, n) => t[n] || (typeof n === 'string' && n ? '🙂' : '') });
+  // typed names: tidy for display; keyOf makes them unique regardless of case/spaces
+  const cleanName = s => String(s || '').replace(/[<>.#$\[\]\/\\"'`]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16);
+  const keyOf = n => cleanName(n).toLowerCase().replace(/\s/g, '');
   const PHASES = ['lobby', 'p1', 'p1x', 'd1', 'p2', 'p2x', 'd6', 'cfo'];
   const $app = document.getElementById('app');
   if (Q.get('host') && VIEW !== 'host') { $app.innerHTML = '<div class="boot">Wrong host key.</div>'; return; }
@@ -37,11 +41,12 @@
   const me = () => players[pid] || null;
   const partOf = () => (ph() === 'p2' || ph() === 'p2x') ? 2 : 1;
   async function join(name) {
-    const owner = await DB.tx(BASE + '/names/' + name, cur => cur ? undefined : pid);
-    const now = await DB.get(BASE + '/names/' + name);
-    if (now !== pid) { ui.overlay = { t: 'rejoin', name, owner: now }; render(true); return; }
+    name = cleanName(name); const k = keyOf(name); if (!k) return;
+    const owner = await DB.tx(BASE + '/names/' + k, cur => cur ? undefined : pid);
+    const now = await DB.get(BASE + '/names/' + k);
+    if (now !== pid) { ui.overlay = { t: 'rejoin', name: (players[now] && players[now].name) || name, owner: now }; render(true); return; }
     await DB.set(BASE + '/players/' + pid, { name, q1: {}, q2: {}, b1: 0, b2: 0, l1: false, l2: false, t: DB.now() });
-    buzz(30);
+    ui.typed = ''; buzz(30); render(true);
   }
   function rejoin(owner) { pid = owner; store.set(PIDK, pid); ui.overlay = null; render(true); }
   function shopData() {
@@ -70,9 +75,10 @@
   function vJoin() {
     const taken = names;
     return table(`<div class="logo">Agent<br><em>Tycoon</em></div><div class="tag">You run <b>Nova</b>, NBD Bank’s new AI agent.<br>Grow revenue. Don’t get burned.</div>
-      <div class="lab">PICK YOUR CODENAME</div><div class="names">${NAMES.map(([n, e]) => `<button class="name ${ui.pick === n ? 'sel' : ''} ${taken[n] && taken[n] !== pid ? 'tk' : ''}" data-name="${n}">${e} ${n}</button>`).join('')}</div>
+      <div class="lab">TYPE YOUR NAME</div><input id="nmin" class="nmin" maxlength="16" autocomplete="off" autocapitalize="words" enterkeyhint="go" placeholder="e.g. Priya or Team Ops" value="${esc(ui.typed || '')}">
+      <div class="lab">OR PICK A CODENAME</div><div class="names">${NAMES.map(([n, e]) => `<button class="name ${!ui.typed && ui.pick === n ? 'sel' : ''} ${taken[keyOf(n)] && taken[keyOf(n)] !== pid ? 'tk' : ''}" data-name="${n}">${e} ${n}</button>`).join('')}</div>
       <div class="note" style="margin-bottom:12px">Faded names are taken. No PIN: this phone remembers you.</div>
-      <button class="btn" id="joinb" ${ui.pick ? '' : 'disabled'}>${ui.pick ? 'I’m ' + esc(ui.pick) : 'Pick a codename'}</button>`);
+      <button class="btn" id="joinb" ${ui.pick ? '' : 'disabled'}>${ui.pick ? 'I’m ' + esc(ui.pick) : 'Type or pick a name'}</button>`);
   }
   function vClosed(msg) { return table(`<div class="logo">Agent<br><em>Tycoon</em></div><div class="mid"><div class="ls">${msg}</div></div>`); }
   const topBar = (r) => `<div class="top"><span class="pill">${EMO[me().name] || '🙂'} ${esc(me().name)}</span><span class="pill g">${r}</span></div>`;
@@ -243,8 +249,16 @@
     return s;
   }
   function bindPlayer() {
-    $app.querySelectorAll('[data-name]').forEach(b => b.onclick = () => { const n = b.dataset.name; if (names[n] && names[n] !== pid) { ui.overlay = { t: 'rejoin', name: n, owner: names[n] }; } else ui.pick = n; render(true); });
-    const jb = document.getElementById('joinb'); if (jb) jb.onclick = () => ui.pick && join(ui.pick);
+    $app.querySelectorAll('[data-name]').forEach(b => b.onclick = () => { const n = b.dataset.name, o = names[keyOf(n)]; ui.typed = ''; if (o && o !== pid) { ui.overlay = { t: 'rejoin', name: n, owner: o }; } else ui.pick = n; render(true); });
+    const jb = document.getElementById('joinb');
+    const tryJoin = () => { if (!ui.pick) return; const o = names[keyOf(ui.pick)]; if (o && o !== pid) { ui.overlay = { t: 'rejoin', name: (players[o] && players[o].name) || cleanName(ui.pick), owner: o }; render(true); } else join(ui.pick); };
+    if (jb) jb.onclick = tryJoin;
+    const ni = document.getElementById('nmin');
+    if (ni) { ni.oninput = () => { ui.typed = ni.value; const c = cleanName(ni.value); ui.pick = c || null; $app.querySelectorAll('.name.sel').forEach(b => b.classList.remove('sel'));
+        if (jb) { jb.disabled = !c; jb.textContent = c ? 'I’m ' + c : 'Type or pick a name'; } };
+      ni.onkeydown = e => { if (e.key === 'Enter') { ni.blur(); tryJoin(); } };
+      ni.onblur = () => setTimeout(() => render(), 0);
+      if (ui.typed) { ni.focus(); try { ni.setSelectionRange(ni.value.length, ni.value.length); } catch (e) {} } }
     const rb = document.getElementById('rejoinb'); if (rb) rb.onclick = () => rejoin(rb.dataset.owner);
     const bw = document.getElementById('borrow'); if (bw) bw.onclick = borrow;
     const lb = document.getElementById('lockb'); if (lb) lb.onclick = () => { ui.overlay = { t: 'lock' }; render(true); };
@@ -382,7 +396,9 @@
   /* ======================= LOOP ======================= */
   function render(force) {
     let sig = VIEW === 'player' ? playerSig() : VIEW === 'board' ? boardSig() : JSON.stringify(state) + JSON.stringify(players);
-    if (!force && sig === lastSig) return; lastSig = sig;
+    if (!force && sig === lastSig) return;
+    if (!force && VIEW === 'player' && document.activeElement && document.activeElement.id === 'nmin') return;
+    lastSig = sig;
     const keepMins = document.getElementById('mins') && document.getElementById('mins').value;
     if (VIEW === 'player') { $app.innerHTML = playerView() + overlayHTML(); bindPlayer(); ui.pop = null;
       const a2 = $app.querySelector('.anim2'), sc = $app.querySelector('.scroll');
