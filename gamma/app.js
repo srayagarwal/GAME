@@ -64,16 +64,16 @@
   function wildState(d) { const q1 = d.part === 1 ? d.q : (me().q1 || {});
     if (d.part === 2 && (me().q1 || {}).IND) return 'used';
     return (q1.LP || 0) >= 1 && (q1.KS || 0) >= 1 ? 'open' : 'locked'; }
-  function deal(k) {
+  function deal(k) { if (guarded() || me()['l' + partOf()] || !(ph() === 'p1' || ph() === 'p2')) return;
     const d = shopData(), c = G.CARD[k]; const n = d.q[k] || 0;
-    if (k === 'IND' && !n) { const w = wildState(d); if (w === 'used') { toast('You already used your wild card in Part 1'); return; }
-      if (w === 'locked') { toast('🔒 Underwriter says no: you need Least privilege + Kill switch to qualify'); buzz([40, 40, 40]); return; } }
+    if (k === 'IND' && !n) { const w = wildState(d); if (w === 'used') { toast('📜 You already bought your one Indemnity policy in Part 1'); return; }
+      if (w === 'locked') { toast('🔒 Indemnity is locked: you need Least privilege + Kill switch, bought in Part 1'); buzz([40, 40, 40]); return; } }
     if (n >= c[6]) { toast(k === 'IND' ? 'One wild card per game' : 'No more ' + c[2] + ' cards on the table'); return; }
     if (d.leftC < c[4]) { const bar = document.querySelector('.bar'); if (bar) { bar.classList.remove('shake'); void bar.offsetWidth; bar.classList.add('shake'); } toast('Not enough chips. Tap +10 to borrow from the bank.'); buzz([40, 40, 40]); return; }
     players[pid]['q' + d.part] = Object.assign({}, d.q, { [k]: n + 1 }); ui.pop = k; buzz(15);
     DB.update(BASE + '/players/' + pid, { ['q' + d.part + '/' + k]: n + 1 }); SFX.deal(); render(true);
   }
-  function undeal(k) {
+  function undeal(k) { if (me()['l' + partOf()] || !(ph() === 'p1' || ph() === 'p2')) { toast('Your hand is locked. Tap ✏️ Change my hand to edit it.'); return; }
     const d = shopData(); const n = d.q[k] || 0; if (!n) return;
     players[pid]['q' + d.part] = Object.assign({}, d.q, { [k]: n - 1 }); ui.pop = null;
     DB.update(BASE + '/players/' + pid, { ['q' + d.part + '/' + k]: n - 1 }); render(true);
@@ -82,7 +82,8 @@
     const d = shopData(); players[pid]['b' + d.part] = d.b + 10; buzz(25);
     DB.update(BASE + '/players/' + pid, { ['b' + d.part]: d.b + 10 }); SFX.chip(); ui.overlay = { t: 'iou' }; render(true);
   }
-  function lock() { const part = partOf(); players[pid]['l' + part] = true; ui.overlay = null; DB.update(BASE + '/players/' + pid, { ['l' + part]: true }); buzz(60); SFX.stamp();
+  const guard = () => { ui.guard = Date.now() + 700; }, guarded = () => Date.now() < (ui.guard || 0);
+  function lock() { if (guarded()) return; const part = partOf(); players[pid]['l' + part] = true; ui.overlay = null; DB.update(BASE + '/players/' + pid, { ['l' + part]: true }); buzz(60); SFX.stamp();
     const q1 = me().q1 || {}, q2 = part === 2 ? (me().q2 || {}) : {}, ctrls = ['PE', 'LP', 'GC', 'LPE'].filter(k => (q1[k] || q2[k]) > 0);
     if (!(q1.RT > 0) && ctrls.length) { ui.flash = { ks: ctrls }; clearTimeout(ui.flashT); ui.flashT = setTimeout(() => { ui.flash = null; render(true); }, 6000); }
     render(true); }
@@ -152,7 +153,7 @@
     const d = me()['q' + part] || {}, listP = part === 1 ? G.P1 : G.P2;
     return table(`${topBar(closed ? 'SHOP CLOSED' : 'PART ' + part)}${newsBanner()}<div class="mid"><div class="lk">🔒</div><div class="lt">Hand locked</div>
       <div class="ls">${closed ? 'Eyes on the screen.<br>Nova goes live…' : 'Eyes on the screen.<br>The shop closes in'}</div>${!closed && t != null ? `<div class="cd cdi">${fmtT(t)}</div>` : '<div style="height:18px"></div>'}
-      <div class="ls"><span id="lockn">${n}</span> of ${L.length} players locked</div><div class="prog"><i style="width:${L.length ? 100 * n / L.length : 0}%"></i></div></div>${handHTML(d, listP, 'YOUR HAND')}`);
+      <div class="ls"><span id="lockn">${n}</span> of ${L.length} players locked</div><div class="prog"><i style="width:${L.length ? 100 * n / L.length : 0}%"></i></div>${closed ? '' : '<button class="btn ghost unl" id="unlockb">✏️ Change my hand</button>'}</div>${handHTML(d, listP, 'YOUR HAND')}`);
   }
   function incRow(id, r, q1, q2, delay) {
     const [, e, name, , , ctrl] = G.INC[id]; const h = r.hits.find(x => x.id === id);
@@ -454,20 +455,21 @@
     const rb = document.getElementById('rejoinb'); if (rb) rb.onclick = () => rejoin(rb.dataset.owner);
     const anb = document.getElementById('anb'); if (anb) anb.onclick = () => { ui.overlay = { t: 'an' }; SFX.flip(); render(true); };
     const apb = document.getElementById('apb'); if (apb) apb.onclick = () => { players[pid].ap = true; DB.update(BASE + '/players/' + pid, { ap: true }); SFX.stamp(); buzz(60); toast('📝 Action plan sent to the CFO'); render(true); };
-    const fl = document.getElementById('flash9'); if (fl) fl.onclick = () => { ui.flash = null; render(true); };
-    const nk = document.getElementById('nwok'); if (nk) nk.onclick = () => { ui.newsTake = null; render(true); };
+    const fl = document.getElementById('flash9'); if (fl) fl.onclick = () => { ui.flash = null; guard(); render(true); };
+    const nk = document.getElementById('nwok'); if (nk) nk.onclick = () => { ui.newsTake = null; guard(); render(true); };
     const nb = document.getElementById('nbar'); if (nb) nb.onclick = () => { const n = released(shopPart()).length; if (n > 1) { ui.newsI = ((ui.newsI || 0) + 1) % n; SFX.chip(); render(true); } };
     const wr = document.getElementById('wbrep'), wh = document.getElementById('wbhid');
-    if (wr) wr.onclick = () => { DB.update(BASE + '/state/wb', { choice: 'report' }); SFX.fanfare(); buzz(60); toast('⭐ Reported. +10 and a Speak-up badge'); };
-    if (wh) wh.onclick = () => { DB.update(BASE + '/state/wb', { choice: 'hide' }); SFX.stamp(); buzz(60); toast('🙈 Hidden. Let’s hope it never comes out…'); };
+    if (wr) wr.onclick = () => { guard(); DB.update(BASE + '/state/wb', { choice: 'report' }); SFX.fanfare(); buzz(60); toast('⭐ Reported. +10 and a Speak-up badge'); };
+    if (wh) wh.onclick = () => { guard(); DB.update(BASE + '/state/wb', { choice: 'hide' }); SFX.stamp(); buzz(60); toast('🙈 Hidden. Let’s hope it never comes out…'); };
     const bw = document.getElementById('borrow'); if (bw) bw.onclick = borrow;
-    const lb = document.getElementById('lockb'); if (lb) lb.onclick = () => { ui.overlay = { t: 'lock' }; render(true); };
+    const lb = document.getElementById('lockb'); if (lb) lb.onclick = () => { if (guarded()) return; ui.overlay = { t: 'lock' }; guard(); render(true); };
+    const ub = document.getElementById('unlockb'); if (ub) ub.onclick = () => { const part = partOf(); players[pid]['l' + part] = false; DB.update(BASE + '/players/' + pid, { ['l' + part]: false }); guard(); SFX.chip(); render(true); };
     const ly = document.getElementById('lockyes'); if (ly) ly.onclick = lock;
     const ca = document.getElementById('cacc'); if (ca) { ca.onclick = acceptCall; startRing(); }
     const cd = document.getElementById('cdecl'); if (cd) cd.onclick = () => { stopRing(); SFX.chip(); ui.call = { stage: 'mail' }; render(true); };
     const ch = document.getElementById('chang'); if (ch) ch.onclick = endCall;
     const cm = document.getElementById('cmail'); if (cm) cm.onclick = endCall;
-    $app.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => { ui.overlay = null; render(true); }));
+    $app.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => { ui.overlay = null; guard(); render(true); }));
     const press = (el, tap, hold) => { let t, held = false;
       el.addEventListener('pointerdown', () => { held = false; t = setTimeout(() => { held = true; buzz(20); hold(); }, 430); });
       ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => el.addEventListener(ev, e => { clearTimeout(t); if (ev === 'pointerup' && !held) tap(); }));
@@ -570,7 +572,7 @@
     const mins = parseFloat((document.getElementById('mins') || {}).value) || cfg.shopMinutes || 6;
     if (to === 'p1' || to === 'p2') { const now = DB.now(), dur = mins * 60000; upd.deadline = now + dur;
       const pt = to === 'p1' ? 1 : 2, nw = G.makeNews(pt); nw[0].at = now + Math.min(90000, dur * 0.3); upd['news/' + pt] = nw;
-      if (to === 'p2' && L.length) { const w = L[Math.floor(Math.random() * L.length)]; upd.wb = { pid: w.id, at: now + Math.min(90000, dur * 0.35), leak: Math.random() < 0.5, choice: null }; } }
+      if (to === 'p2' && L.length) { const w = L[Math.floor(Math.random() * L.length)]; upd.wb = { pid: w.id, at: now + Math.min(150000, dur * 0.55), leak: Math.random() < 0.5, choice: null }; } }
     else upd.deadline = null;
     if (to === 'p1x') { const u = {}; L.forEach(p => { if (!p.l1) u[p.id + '/l1'] = true; }); if (Object.keys(u).length) await DB.update(BASE + '/players', u); }
     if (to === 'p2x') { const u = {}; L.forEach(p => { if (!p.l2 && Object.values(p.q2 || {}).some(v => v > 0)) u[p.id + '/l2'] = true; }); if (Object.keys(u).length) await DB.update(BASE + '/players', u); }
@@ -643,11 +645,11 @@
     const part = shopPart(), rel = part ? released(part).length : 0, key = ph() + ':' + rel;
     if (key !== relKey) { const first = relKey === undefined; relKey = key;
       if (!first && rel > 0 && (ph() === 'p1' || ph() === 'p2')) {
-        if (VIEW === 'player' && me()) { ui.newsTake = { part, i: rel - 1 }; ui.newsI = rel - 1; SFX.news(); buzz([90, 60, 90]); }
+        if (VIEW === 'player' && me()) { ui.newsTake = { part, i: rel - 1 }; ui.newsI = rel - 1; guard(); SFX.news(); buzz([90, 60, 90]); }
         if (VIEW === 'board') { ui.bTake = { part, i: rel - 1 }; SFX.news(); clearTimeout(ui.bT); ui.bT = setTimeout(() => { ui.bTake = null; render(true); }, 10000); } }
       if (rel === 0) { ui.newsI = 0; ui.newsTake = null; }
       render(true); }
-    if (VIEW === 'player') { const w = wbLive(); if (w !== ui.wbOn) { ui.wbOn = w; if (w) { SFX.heartbeat(2, 0); buzz([200, 100, 200, 100, 200]); } render(true); } }
+    if (VIEW === 'player') { const w = wbLive(); if (w !== ui.wbOn) { ui.wbOn = w; guard(); if (w) { SFX.heartbeat(2, 0); buzz([200, 100, 200, 100, 200]); } render(true); } }
   }, 500);
   let lastPhase = null;
   DB.on(BASE + '/state', s => { state = s || { phase: 'lobby' }; if (lastPhase && lastPhase !== state.phase) { ui.overlay = null; buzz(50); } lastPhase = state.phase; render(); });
