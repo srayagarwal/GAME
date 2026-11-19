@@ -72,7 +72,7 @@
   /* player: {q1, q2, b1, b2, has2}; on: list of fired incident ids; final: include Day 6 */
   function score(player, on, final) {
     const q1 = full(player.q1, P1), q2 = full(player.q2, P2), has2 = !!player.has2;
-    const s1 = spent(q1, P1), s2 = has2 ? spent(q2, P2) : 0;
+    const s1 = player.s1 != null ? player.s1 : spent(q1, P1), s2 = has2 ? (player.s2 != null ? player.s2 : spent(q2, P2)) : 0;
     const rev1 = 50 + 30 * q1.PAY + 15 * q1.MKT - 5 * q1.HU, rev2 = has2 ? 50 + 30 * q2.LOAN : 0;
     const bust1 = s1 > BUDGET1 ? BUST : 0, bust2 = has2 && s2 > BUDGET2 ? BUST : 0;
     let pen1 = 0, pen2 = 0, u1 = 0, u2 = 0; const hits = [];
@@ -92,14 +92,18 @@
     // whistleblower (Part 2 surprise): report = +10, hide = 50% chance of −60 on Day 6
     const wb = final && player.wb ? (player.wb.choice === 'report' ? 10 : (player.wb.leak ? -60 : 0)) : 0;
     const gov1 = q1.GO ? 1.5 : 1;
-    const mid = Math.round((rev1 - pen1 - bust1) * gov1 / (1 + TRUST_PER_HIT * u1 * (1 - rem(q1, {}))));
+    // below-zero rule: if money minus damage is already negative, the owner boost and trust damage are skipped (they only scale a positive score)
+    const base1 = rev1 - pen1 - bust1, neg1 = base1 < 0, trust1raw = 1 + TRUST_PER_HIT * u1 * (1 - rem(q1, {}));
+    const mid = neg1 ? Math.round(base1) : Math.round(base1 * gov1 / trust1raw);
     const gov = q1.GO ? 1.5 : (q2.LGO ? 1.25 : 1);
-    const cards = Object.values(q1).reduce((a, b) => a + b, 0) + Object.values(q2).reduce((a, b) => a + b, 0);
+    const cards = player.cards != null ? player.cards : Object.values(q1).reduce((a, b) => a + b, 0) + Object.values(q2).reduce((a, b) => a + b, 0);
     const lit = LIT_PER_CARD * cards * (q2.LT || 0);
     const r = rem(q1, q2), trust = 1 + TRUST_PER_HIT * (u1 + u2) * (1 - r);
-    const fin = Math.round(((rev1 + rev2 - pen1 - pen2 - bust1 - bust2) * gov + lit) / trust) + wb;
+    const base = rev1 + rev2 - pen1 - pen2 - bust1 - bust2, neg = base < 0;
+    const fin = (neg ? Math.round(base + lit) : Math.round((base * gov + lit) / trust)) + wb;
     return { wb, arts, mid, fin, hits, s1, s2, total: s1 + s2, dq: s1 + s2 > TOTAL, rev: rev1 + rev2, rev1, pen: Math.round(pen1 + pen2), pen1: Math.round(pen1),
-      bust: bust1 + bust2, bust1, gov, gov1, lit, trust: Math.round(trust * 100) / 100, trust1: Math.round((1 + TRUST_PER_HIT * u1 * (1 - rem(q1, {}))) * 100) / 100, n: u1 + u2 };
+      bust: bust1 + bust2, bust1, gov: neg ? 1 : gov, gov1: neg1 ? 1 : gov1, lit, trust: neg ? 1 : Math.round(trust * 100) / 100, trust1: neg1 ? 1 : Math.round(trust1raw * 100) / 100, n: u1 + u2,
+      neg, neg1, govSet: gov, trustSet: Math.round(trust * 100) / 100 };
   }
   /* incident pick: same as the sheet. Most exposed players first (exposed + ½ halved) */
   /* Gamma: incidents are drawn at random. A REAL headline doubles that incident's chance; a fake one does nothing. Sleepers always wake on Day 6. */

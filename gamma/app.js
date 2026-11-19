@@ -235,7 +235,115 @@
     return table(`${topBar(fin ? 'CFO REVIEW' : 'DAY 6 · FINAL')}<div class="scroll"><div class="h2">The sleepers wake up</div><div class="incs ${anim ? 'anim' : ''}">${rows}${wbRow}</div>${intro}
       <div class="anim2" style="animation-delay:${sd}s"><div class="sc" style="margin-top:16px"><div class="scl">FINAL SCORE</div><div class="scv" data-count="${r.fin}">${anim ? 0 : r.fin}</div><div class="scr">${fin && r.dq ? 'Not ranked' : `Rank ${rk} of ${of}${fin ? ' on budget' : ''}`}</div></div>
       <div class="calc"><div><span>Revenue</span><b>${r.rev}</b></div><div><span>Incident hits</span><b class="r">−${r.pen}</b></div>${r.bust ? `<div><span>Over budget</span><b class="r">−${r.bust}</b></div>` : ''}<div><span>Owner</span><b>×${r.gov}</b></div><div><span>AI literacy</span><b class="gtxt">+${r.lit}</b></div><div><span>Trust damage (${r.n} hits)</span><b>÷${r.trust}</b></div>${r.wb ? `<div><span>${r.wb > 0 ? '⭐ Spoke up' : '📰 Cover-up'}</span><b class="${r.wb > 0 ? 'gtxt' : 'r'}">${r.wb > 0 ? '+' : ''}${r.wb}</b></div>` : ''}</div>
-      ${verdict}${breaches}${fin ? cfoBoard() : miniBoard('fin', 'LEADERBOARD · BEFORE CFO REVIEW')}${fin ? '' : '<div class="tease">Wait for the CFO…</div>'}</div></div>`);
+      ${verdict}${breaches}${fin ? '<button class="btn anb" id="anb">📊 See my analysis</button>' : ''}${fin ? cfoBoard() : miniBoard('fin', 'LEADERBOARD · BEFORE CFO REVIEW')}${fin ? '' : '<div class="tease">Wait for the CFO…</div>'}</div></div>`);
+  }
+  /* ---------- end-of-game analysis: how the score was made, what each card did ---------- */
+  function analysisHTML() {
+    const m = me(), on = fired(), wb = wbOf(m), has = has2(m);
+    const base = { q1: m.q1 || {}, q2: m.q2 || {}, has2: has, wb };
+    const r = G.score(base, on, true), s1 = r.s1, s2 = r.s2;
+    const q1 = G.full(m.q1, G.P1), q2 = G.full(m.q2, G.P2), ncards = Object.values(q1).reduce((a, b) => a + b, 0) + Object.values(q2).reduce((a, b) => a + b, 0);
+    const without = k => { const a = Object.assign({}, m.q1 || {}), b = Object.assign({}, m.q2 || {}); if (k in a) a[k] = 0; if (k in b) b[k] = 0;
+      return G.score({ q1: a, q2: b, has2: has, wb, s1, s2, cards: ncards }, on, true).fin; };
+    const nm = id => G.INC[id][1] + ' ' + G.INC[id][2], hit = id => r.hits.find(h => h.id === id);
+    const covers = k => { const ids = Object.keys(G.CTRL).filter(id => G.CTRL[id] === k);
+      if (k === 'PE' || k === 'LPE') ids.push('S_EMAIL'); if (['AU', 'GO', 'LGO', 'LAU'].includes(k)) ids.push('S_AUDIT'); return ids; };
+    const P = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);
+    // what each card did
+    const owned = G.P1.filter(c => (m.q1 || {})[c[0]] > 0).concat(has ? G.P2.filter(c => (m.q2 || {})[c[0]] > 0) : []);
+    const seen = {}; const rows = [];
+    owned.forEach(c => { const k = c[0]; if (seen[k]) return; seen[k] = 1; const n = ((m.q1 || {})[k] || 0) + (has ? ((m.q2 || {})[k] || 0) : 0), worth = r.fin - without(k);
+      const lines = [];
+      if (k === 'PAY') { const pre = Math.round(r.hits.reduce((a, h) => a + (h.ind ? 0 : h.v), 0) / (1 + 0.25 * n));
+        lines.push(`+${30 * n} revenue`, `but every hit on you was ${25 * n}% bigger`,
+          `Payments is a bet on your protection: it pays off only if your hits stay under about 120`,
+          worth > 0 ? `It paid off for you: your hits were only ${pre} before Payments` : worth < 0 ? `It cost you: your hits were ${pre} before Payments, so the extra damage beat the extra money` : `It broke even: your hits were ${pre} before Payments`); }
+      else if (k === 'MKT') lines.push(`+${15 * n} revenue`);
+      else if (k === 'LOAN') lines.push(`+${30 * n} revenue`, on.includes('FAIR') ? 'and made the fairness fine bigger' : 'the fairness fine it risks never came');
+      else if (k === 'GO') lines.push(r.neg ? 'Boost skipped: money minus damage was below zero' : 'Whole score ×1.5');
+      else if (k === 'LGO') lines.push(q1.GO ? 'No extra multiplier: your Named owner already gave ×1.5' : r.neg ? 'Boost skipped: money minus damage was below zero' : 'Whole score ×1.25');
+      else if (k === 'VM') lines.push(r.neg ? 'Trust damage was skipped (score below zero), so nothing to cut' : `Cut trust damage by ${n >= 2 ? 65 : 50}%`);
+      else if (k === 'LRM') lines.push(r.neg ? 'Trust damage was skipped (score below zero), so nothing to cut' : 'Cut trust damage by 25%');
+      else if (k === 'SA') lines.push('Made every Day 6 hit 25% smaller');
+      else if (k === 'LT') lines.push(`+${r.lit} literacy points (1 per card you own)`);
+      else if (k === 'IND') { const h = r.hits.find(x => x.ind); lines.push(h ? `Paid your biggest hit: ${nm(h.id)} (${h.raw})` : 'Nothing big enough got through to claim'); }
+      if (k === 'HU') lines.push(`−${5 * n} revenue (humans are slower)`);
+      if (k === 'RT' && G.RTS.some(id => on.includes(id) && G.shield(id, q1, q2) > 0)) lines.push('Tested your other controls, so they worked at 100%');
+      covers(k).forEach(id => { if (!on.includes(id)) { lines.push(`${nm(id)} never came`); return; }
+        const h = hit(id); lines.push((h && h.raw === 0 ? `Blocked ${nm(id)}` : `Reduced ${nm(id)} to −${h ? h.raw : 0}`) + (h && h.ind ? ', but your Indemnity policy paid that one anyway' : '')); });
+      const wasted = c[7].slice(0, n).filter(t => /^No extra effect/.test(t)).length; if (wasted) lines.push(`${wasted} extra cop${wasted > 1 ? 'ies' : 'y'} had no extra effect`);
+      if (worth === 0 && covers(k).some(id => on.includes(id) && hit(id) && hit(id).raw === 0)) lines.push('your other cards already had it covered');
+      rows.push({ k, n, worth, lines, cost: c[4] * n }); });
+    rows.sort((a, b) => b.worth - a.worth);
+    const card = x => { const c = G.CARD[x.k], cls = x.worth > 0 ? 'up' : x.worth < 0 ? 'dn' : 'zero';
+      return `<div class="anr ${cls}"><div class="ant"><span>${c[1]} ${esc(c[2])}${x.n > 1 ? ' ×' + x.n : ''}<i>${x.cost} chips</i></span><b>${x.worth === 0 ? 'did nothing' : P(x.worth) + ' pts'}</b></div><div class="anl">${x.lines.map(esc).join(' · ')}</div></div>`; };
+    // attacks that got through with nothing in the way
+    const gaps = r.hits.filter(h => h.raw > 0 && h.lvl === 0).map(h => { const ctrl = h.id === 'S_EMAIL' ? 'PE' : h.id === 'S_AUDIT' ? 'AU' : G.CTRL[h.id];
+      return `<div class="anr dn"><div class="ant"><span>${nm(h.id)}</span><b>−${h.raw}</b></div><div class="anl">Nothing stopped it. One ${G.CARD[ctrl][1]} ${esc(G.CARD[ctrl][2])} card (${G.CARD[ctrl][4]} chips) would have halved it.</div></div>`; }).join('');
+    const unspent = Math.max(0, 100 + (m.b1 || 0) - s1) + (has ? Math.max(0, 80 + (m.b2 || 0) - s2) : 0);
+    // the score: equation first, then each number explained in words
+    const f1 = x => { const v = Math.round(x * 10) / 10; return (v < 0 ? '−' : '') + Math.abs(v); };
+    const cn = k => G.CARD[k][1] + ' ' + G.CARD[k][2];
+    const protBy = id => { const ks = id === 'S_EMAIL' ? ['PE', 'LPE'] : id === 'S_AUDIT' ? ['AU', 'GO', 'LGO', 'LAU'] : [G.CTRL[id]];
+      return ks.filter(k => (q1[k] || 0) + (has ? (q2[k] || 0) : 0) > 0).map(cn).join(' + '); };
+    const chain = h => { const inc = G.INC[h.id]; let v = inc[4]; const st = [`starts at <b>${v}</b>`];
+      if (h.lvl >= 2) st.push(`blocked by ${esc(protBy(h.id))} → <b>0</b>`);
+      else { if (h.lvl === 1) { const w = G.weak(h.id, q1); v = v * (w ? 0.625 : 0.5);
+          st.push(w ? `${esc(protBy(h.id))} cut it, but only by 37.5% because you had no Red team → <b>${f1(v)}</b>` : `${esc(protBy(h.id))} halved it → <b>${f1(v)}</b>`); }
+        else st.push('nothing stopped it');
+        if (q1.PAY) { v *= 1 + 0.25 * q1.PAY; st.push(`Payments made it ${25 * q1.PAY}% bigger → <b>${f1(v)}</b>`); }
+        if (h.id === 'FAIR' && q2.LOAN) { v *= 1 + 0.5 * q2.LOAN; st.push(`Loans made it ${50 * q2.LOAN}% bigger → <b>${f1(v)}</b>`); }
+        if (h.part === 2 && has && q2.SA) { v *= 0.75; st.push(`Seeded test made it 25% smaller → <b>${f1(v)}</b>`); }
+        if (h.ind) st.push(`your Indemnity policy paid it → <b>0</b>`); }
+      return `<div class="vrow"><span>${nm(h.id)}</span><b>${h.v ? '−' + h.v : '0'}</b></div><div class="vchain">${st.join(' → ')}</div>`; };
+    const keep = Math.round(100 / r.trust), rp = Math.round((1 - (r.trust - 1) / (0.2 * Math.max(1, r.n))) * 100);
+    const rev1d = [`50 to start`].concat(q1.PAY ? [`+ ${30 * q1.PAY} Payments`] : [], q1.MKT ? [`+ ${15 * q1.MKT} Marketing`] : [], q1.HU ? [`− ${5 * q1.HU} Human check`] : []).join(' ');
+    const rev2d = has ? [`50 to start`].concat(q2.LOAN ? [`+ ${30 * q2.LOAN} Loans`] : []).join(' ') : '';
+    const V = (cls, ico, name, val, body) => `<div class="vbox ${cls}"><div class="vhd"><span>${ico} ${name}</span><b>${val}</b></div>${body}</div>`;
+    const boxes =
+      V('c1', '💰', 'Money you made', r.rev, `<p>Every company starts with 50 in each part. Some cards add money, some take a little away.</p>
+        <div class="vrow"><span>Part 1: ${rev1d}</span><b>${r.rev1}</b></div>${has ? `<div class="vrow"><span>Part 2: ${rev2d}</span><b>${r.rev - r.rev1}</b></div>` : '<p>You didn’t play Part 2, so no money from it.</p>'}`)
+      + V('c2', '💥', 'Damage from attacks', '−' + r.pen, `<p>${on.length} attacks happened. Each one starts with a damage number. Your cards make it smaller, Payments make it bigger.</p>${r.hits.map(chain).join('')}`)
+      + V('c3', '🚫', 'Overspend fine', r.bust ? '−' + r.bust : '0', r.bust ? `<p>You spent more than the budget${r.bust1 ? ' in Part 1 (limit 100)' : ''}${r.bust - (r.bust1 || 0) ? ' in Part 2 (limit 80)' : ''}, counting IOUs. Going over costs a flat 50.</p>` : '<p>You stayed within budget, so no fine.</p>')
+      + (r.neg ? V('c4', '📋', 'Owner boost', 'skipped', `<p>${r.govSet > 1 ? `You bought an owner card, but money minus damage was <b>below zero</b>.` : 'Nobody owned the AI, and money minus damage was below zero anyway.'} A boost only multiplies a positive score, so it was skipped.</p>`) : '')
+      + (r.neg ? '' : V('c4', '📋', 'Owner boost', '×' + r.gov, r.gov === 1.5 ? '<p>You bought a <b>Named owner</b>, so someone is accountable for the AI. Your total is multiplied by 1.5 (one and a half times).</p>'
+          : r.gov === 1.25 ? '<p>You bought a <b>Late owner</b> in Part 2. Your total is multiplied by 1.25.</p>' : '<p>Nobody owned the AI, so no boost (×1 means it stays the same).</p>'))
+      + (q2.LT && has ? V('c5', '🎓', 'Literacy bonus', '+' + r.lit, `<p>Your AI literacy card gives ${q2.LT} point${q2.LT > 1 ? 's' : ''} for every card you own. You own ${ncards} cards → <b>${r.lit}</b>.</p>`) : '')
+      + (r.neg ? V('c6', '🤝', 'Trust damage', 'skipped', `<div class="hearts">${'💔'.repeat(r.n)}<span>${r.n} attack${r.n > 1 ? 's' : ''} got through</span></div><p>Trust damage takes away a <b>share</b> of a positive score. Your money minus damage was already below zero, so there was nothing left to take a share of. It was skipped.</p>`) : '')
+      + (r.neg ? '' : (() => { const t3b = (r.rev - r.pen - r.bust) * r.gov + r.lit, aft = Math.round(t3b / r.trust), lost = Math.round((1 - 1 / r.trust) * 100),
+          noRep = Math.round((1 - 1 / (1 + 0.2 * r.n)) * 100), fr = x => ({ 50: 'half', 33: 'a third', 25: 'a quarter', 67: 'two thirds' })[x],
+          pc = x => x + '%' + (fr(x) ? ` (${fr(x)})` : ''), reps = [q1.VM ? 'Vuln. mgmt' : '', q2.LRM && has ? 'Late remediation' : ''].filter(Boolean).join(' + ');
+        const body = !r.n ? '<p>No attacks got through, so customers still trust you. You keep your whole score.</p>'
+          : `<p>When attacks get through, customers stop trusting you and some walk away. So you lose a <b>share</b> of your score, not a fixed number.</p>
+          <div class="hearts">${'💔'.repeat(r.n)}<span>${r.n} attack${r.n > 1 ? 's' : ''} got through</span></div>
+          <div class="vrow"><span>With no repair cards you would lose</span><b>${pc(noRep)}</b></div>
+          <div class="vrow"><span>${reps ? `Your ${reps} repaired some of it, so you lose` : 'You had no repair cards, so you lose'}</span><b>${pc(lost)}</b></div>
+          ${t3b > 0 ? `<div class="kbar2"><i style="width:${100 - lost}%">Kept ${aft}</i><u>Lost ${Math.round(t3b - aft)}</u></div>
+          <div class="vrow"><span>Score before trust damage</span><b>${f1(t3b)}</b></div><div class="vrow"><span>Score after</span><b>${aft}</b></div>`
+          : `<div class="vrow"><span>Score before trust damage</span><b>${f1(t3b)}</b></div><div class="vrow"><span>Score after</span><b>${aft}</b></div>
+          <p>Your score was already below zero, so taking a share away made the minus smaller.</p>`}`;
+        return V('c6', '🤝', 'Trust damage', r.n && t3b > 0 ? `−${Math.round(t3b - aft)} <small>(÷${r.trust})</small>` : '÷' + r.trust, body); })())
+      + (r.wb ? V('c7', '📣', 'Whistleblower', P(r.wb), r.wb > 0 ? '<p>You reported the problem. Honesty bonus +10.</p>' : '<p>You hid the problem and it leaked. −60.</p>') : '');
+    const t1 = r.rev - r.pen - r.bust, t2 = t1 * r.gov, t3 = t2 + r.lit;
+    const lad = (l, v, x) => `<div class="lad${x ? ' skip' : ''}"><span>${l}</span><b>${v}</b></div>`;
+    const ladder = lad(`💰 ${r.rev} − 💥 ${r.pen}${r.bust ? ' − 🚫 ' + r.bust : ''}`, f1(t1))
+      + (r.neg ? lad('× 📋 Owner boost: skipped (below zero)', f1(t1), 1) : lad(`× 📋 ${r.gov}`, f1(t2)))
+      + (r.lit ? lad(`+ 🎓 ${r.lit}`, f1(r.neg ? t1 + r.lit : t3)) : '')
+      + (r.neg ? lad('÷ 🤝 Trust damage: skipped (below zero)', f1(t1 + r.lit), 1) : lad(`÷ 🤝 ${r.trust}`, Math.round(t3 / r.trust)))
+      + (r.wb ? lad(`${r.wb > 0 ? '+' : '−'} 📣 ${Math.abs(r.wb)}`, r.fin) : '');
+    const eq = `<div class="eqs">Your score = what you <i class="c1">💰 earned</i>, minus <i class="c2">💥 attack damage</i> and any <i class="c3">🚫 overspend fine</i> → multiply by your <i class="c4">📋 owner boost</i> → add your <i class="c5">🎓 literacy bonus</i> → then <i class="c6">🤝 trust damage</i> takes a share away${r.wb ? ' → plus or minus the <i class="c7">📣 whistleblower</i> result' : ''}.</div>
+      <div class="eqs2">If money minus damage is already below zero, the owner boost and trust damage are skipped.</div>
+      <div class="eqn">${r.neg ? `( <i class="c1">${r.rev}</i> − <i class="c2">${r.pen}</i> − <i class="c3">${r.bust}</i> ) + <i class="c5">${r.lit}</i>`
+        : `[ ( <i class="c1">${r.rev}</i> − <i class="c2">${r.pen}</i> − <i class="c3">${r.bust}</i> ) × <i class="c4">${r.gov}</i> + <i class="c5">${r.lit}</i> ] ÷ <i class="c6">${r.trust}</i>`}${r.wb ? ` ${r.wb > 0 ? '+' : '−'} <i class="c7">${Math.abs(r.wb)}</i>` : ''} = <b>${r.fin}</b></div>`;
+    return `<div class="anov"><div class="anh"><div><small>YOUR ANALYSIS</small>${EMO[m.name]} ${esc(m.name)}</div><b>${r.fin}</b></div><div class="anb2">
+      <div class="ansec">HOW YOUR SCORE WORKS</div><div class="anw">${eq}</div>
+      <div class="anatk"><b>ATTACKS THIS GAME</b>${on.map(id => `<span>${nm(id)}</span>`).join('')}</div>
+      <div class="ansec">WHERE EACH NUMBER CAME FROM</div>${boxes}
+      <div class="ansec">PUTTING IT TOGETHER</div><div class="anw">${ladder}<div class="ans tot"><span>Final score</span><b>${r.fin}</b></div></div>
+      <div class="ansec">WHAT EACH CARD DID <i>points it added to your final score</i></div>${rows.length ? rows.map(card).join('') : '<div class="anl">You didn’t buy any cards.</div>'}
+      ${gaps ? `<div class="ansec">WHAT HURT YOU MOST</div>${gaps}` : ''}
+      ${unspent ? `<div class="antip">💡 You left <b>${unspent} chips</b> unspent.</div>` : ''}
+      </div><button class="btn anx" data-close="1">Close</button></div>`;
   }
   function cardBack(k) {
     const c = G.CARD[k], [, e, n, , cost, s] = c, kind = { r: 'REVENUE', b: 'CONTROL', f: 'ONE-OFF FIX', w: 'WILD CARD' }[s];
@@ -262,6 +370,7 @@
   function overlayHTML() {
     const o = ui.overlay; if (!o) return '';
     if (o.t === 'flip') return flipHTML(o.k);
+    if (o.t === 'an') return analysisHTML();
     if (o.t === 'flipold') { const c = G.CARD[o.k]; return `<div class="ov" data-close="1"><div class="flip"><div class="fh">${c[1]}</div><h3>${esc(c[2])}</h3><div class="fs">${c[4]} chips · ${esc(c[3])}</div>${c[7].map((t, i) => `<div class="cp ${/Wasted/.test(t) ? 'dim' : ''}"><b>×${i + 1}</b>${esc(t)}</div>`).join('')}</div></div>`; }
     if (o.t === 'iou') { const d = shopData(); return `<div class="ov" data-close="1"><div class="iou"><div class="iouh">IOU · NBD BANK</div><div class="iouv">${d.b} chips</div><div class="iout">${esc(me().name)} borrowed ${Array(d.b / 10).fill(10).join(' + ')}.<br>Charged to NBD Bank’s<br>annual AI budget.</div><div class="sig">${esc(me().name)}</div></div></div>`; }
     if (o.t === 'lock') { const d = shopData(); return `<div class="ov"><div class="sheet"><h3>Lock your hand?</h3><p>You can’t change your cards after locking.${d.leftC > 0 ? `<br>You still have <b style="color:var(--gold)">${d.leftC} chips</b> unspent.` : ''}</p><div class="row2"><button class="btn ghost" data-close="1">Keep playing</button><button class="btn" id="lockyes">Lock it</button></div></div></div>`; }
@@ -343,6 +452,7 @@
       ni.onblur = () => setTimeout(() => render(), 0);
       if (ui.typed) { ni.focus(); try { ni.setSelectionRange(ni.value.length, ni.value.length); } catch (e) {} } }
     const rb = document.getElementById('rejoinb'); if (rb) rb.onclick = () => rejoin(rb.dataset.owner);
+    const anb = document.getElementById('anb'); if (anb) anb.onclick = () => { ui.overlay = { t: 'an' }; SFX.flip(); render(true); };
     const apb = document.getElementById('apb'); if (apb) apb.onclick = () => { players[pid].ap = true; DB.update(BASE + '/players/' + pid, { ap: true }); SFX.stamp(); buzz(60); toast('📝 Action plan sent to the CFO'); render(true); };
     const fl = document.getElementById('flash9'); if (fl) fl.onclick = () => { ui.flash = null; render(true); };
     const nk = document.getElementById('nwok'); if (nk) nk.onclick = () => { ui.newsTake = null; render(true); };
@@ -439,7 +549,17 @@
       <div class="split" style="grid-template-columns:1fr 1fr"><div><div class="lbh">ON BUDGET</div><table class="lb">${ok.slice(3, 9).map((x, i) => `<tr><td>${i + 4}</td><td>${EMO[x.p.name] || ''} ${esc(x.p.name)}</td><td class="s">spent ${x.r.total}</td><td>${x.r.fin}</td></tr>`).join('')}</table></div>
       <div><div class="lbh">DISQUALIFIED BY THE CFO · ${dq.length} PLAYERS</div><table class="lb">${dq.slice(0, 6).map(x => `<tr class="dq"><td>❌</td><td>${EMO[x.p.name] || ''} ${esc(x.p.name)}</td><td class="s">spent ${x.r.total}</td><td>${x.r.fin}</td></tr>`).join('')}</table>
       ${dq.length ? `<div class="dqline">Top raw score: <b>${esc(dq[0].p.name)} ${dq[0].r.fin}</b>, spent ${dq[0].r.total} of ${G.TOTAL}. No budget, no bonus.</div>` : ''}</div></div><div class="stamp" style="animation-delay:${first ? 7 : 0}s">CFO REVIEW</div>${first ? `<div class="intro big bcall" style="animation-delay:5.2s"><div class="cl-av big">CFO</div><div class="ik">INCOMING CALL · NBD BANK</div><div class="iq">The CFO is calling every player…</div><div class="bsub" style="margin-top:2vh">Pick up your phone</div></div>` : ''}`; }
+    if (state.about) { inner = aboutHTML(); newsB = ''; }
     return `<div class="bd"><div class="oval"></div><div class="bin">${inner}</div></div>${newsB}<button class="snd ${SFX.enabled ? 'on' : ''}" id="snd">${SFX.enabled ? '🔊' : '🔇 Click for sound'}</button>${DB.mode === 'demo' ? '<div class="demo">DEMO MODE</div>' : ''}`;
+  }
+  function aboutHTML() {
+    const col = (n, ico, h, sub, li) => `<div class="abc"><div class="abn">${n}</div><div class="abi">${ico}</div><h3>${h}</h3><div class="abs">${sub}</div><ul>${li.map(x => `<li>${x}</li>`).join('')}</ul></div>`;
+    return `<div class="ab"><div class="abt"><small>AGENT TYCOON · GAMMA · WHAT IS THIS GAME?</small><h1>Can you grow your AI agent <em>without getting burned?</em></h1>
+      <p>You run <b>Nova</b>, your company’s new AI agent. Make it earn money, protect it from what can go wrong, and stay on the right side of the <b>EU AI Act</b>. Your CFO is watching every chip.</p></div>
+      <div class="ab3">${col(1, '🛒', 'Buy cards', 'Part 1: 100 chips · Part 2: 80 chips', ['💰 <b>Money cards</b> earn revenue, but make you a bigger target', '🛡️ <b>Control cards</b> stop attacks: one card halves it, two block it', '🩹 <b>Late fixes</b> patch gaps in Part 2'])}
+      ${col(2, '💥', 'Attacks hit', 'Day 1 and Day 6', ['🌙 <b>Day 1:</b> random attacks on Nova’s first night', '😴 <b>Day 6:</b> sleepers from Day 1 wake up, with new attacks', '📰 <b>Breaking news</b> hints what’s coming, but it might be fake'])}
+      ${col(3, '🧾', 'The CFO reviews', 'The final verdict', ['⚖️ Every attack that gets through breaks an <b>EU AI Act</b> article', '❌ Spend more than <b>180 chips</b> in total and you’re out', '🏆 <b>Highest score wins</b>'])}</div>
+      <div class="abf"><b>HOW YOUR SCORE WORKS</b><div>Your score = what you <i class="c1">💰 earned</i> − <i class="c2">💥 attack damage</i> − <i class="c3">🚫 overspend fine</i> → × your <i class="c4">📋 owner boost</i> → + your <i class="c5">🎓 literacy bonus</i> → then <i class="c6">🤝 trust damage</i> takes a share away</div></div></div>`;
   }
   const boardSig = () => ph() + '|' + released(shopPart()).length + '|' + JSON.stringify(ui.bTake || null) + '|' + JSON.stringify(state) + '|' + (ph() === 'lobby' ? Object.values(players).map(x => x.name).join() : ['d1', 'd6', 'cfo'].includes(ph()) ? Object.keys(players).length : JSON.stringify(players));
 
@@ -475,7 +595,7 @@
     const rows = L.map(x => ({ x, r: scoreOf(x) })).sort((a, b) => (at('d6') ? b.r.fin - a.r.fin : b.r.mid - a.r.mid));
     const url = playerURL(), burl = location.origin + location.pathname + '?board' + (ROOM !== (cfg.room || 'main') ? '&room=' + ROOM : '');
     return `<div class="host"><h1>Tycoon Gamma · <em>host</em></h1><div class="hs">Room <b>${esc(ROOM)}</b> · phase <b>${p}</b> · ${L.length} players · ${locked} locked${t != null ? ' · shop timer <b class="cdi">' + fmtT(t) + '</b>' : ''}${DB.mode === 'demo' ? ' · <b style="color:var(--coral)">DEMO MODE (no Firebase config)</b>' : ''}</div>
-      <div class="hgrid">${btns}<button class="hb" id="exp"><span>⬇ Export results (CSV)</span><i></i></button></div>
+      <div class="hgrid">${btns}<button class="hb" id="exp"><span>⬇ Export results (CSV)</span><i></i></button><button class="hb${state.about ? ' go' : ''}" id="about"><span>📖 ${state.about ? 'Hide' : 'Show'} “What is this game?” on the big screen</span><i></i></button></div>
       <div class="hbox"><h3>SHOP TIMER</h3><div class="hrow">Minutes for the next shop round <input id="mins" type="number" min="1" max="30" value="${cfg.shopMinutes || 6}"> <button class="sbtn" data-add="1">+1 min now</button><button class="sbtn" data-add="-1">−1 min now</button></div></div>
       ${state.news ? `<div class="hbox"><h3>BREAKING NEWS · HOST ONLY</h3><div style="font-weight:700;line-height:1.8">${[1, 2].filter(k => state.news[k]).map(k => state.news[k].map((n, i) => `Part ${k} · <span style="color:${n.real ? 'var(--mint)' : 'var(--coral)'}">${n.real ? 'REAL' : 'FAKE'}</span> · ${G.INC[n.id][1]} ${esc(G.NEWS[n.id][0])} · ${DB.now() >= n.at ? 'out' : 'in ' + fmtT(n.at - DB.now())}`).join('<br>')).join('<br>')}</div></div>` : ''}
       ${state.wb && players[state.wb.pid] ? `<div class="hbox"><h3>WHISTLEBLOWER · HOST ONLY</h3><div style="font-weight:700;line-height:1.8">${EMO[players[state.wb.pid].name]} ${esc(players[state.wb.pid].name)} · ${DB.now() >= state.wb.at ? 'pop-up shown' : 'pop-up in ' + fmtT(state.wb.at - DB.now())} · choice: <b>${state.wb.choice || '—'}</b> · if hidden it ${state.wb.leak ? '<b style="color:var(--coral)">WILL leak</b>' : 'will not leak'}</div></div>` : ''}
@@ -488,7 +608,7 @@
   function bindHost() {
     $app.querySelectorAll('[data-step]').forEach(b => b.onclick = () => step(+b.dataset.step));
     $app.querySelectorAll('[data-add]').forEach(b => b.onclick = () => addTime(+b.dataset.add));
-    document.getElementById('exp').onclick = exportCSV; document.getElementById('back').onclick = back; document.getElementById('reset').onclick = reset;
+    document.getElementById('exp').onclick = exportCSV; document.getElementById('about').onclick = () => DB.update(BASE + '/state', { about: !state.about }); document.getElementById('back').onclick = back; document.getElementById('reset').onclick = reset;
   }
 
   let fitNews = false;
