@@ -85,7 +85,7 @@
   const guard = () => { ui.guard = Date.now() + 700; }, guarded = () => Date.now() < (ui.guard || 0);
   function lock() { if (guarded()) return; const part = partOf(); players[pid]['l' + part] = true; ui.overlay = null; DB.update(BASE + '/players/' + pid, { ['l' + part]: true }); buzz(60); SFX.stamp();
     const q1 = me().q1 || {}, q2 = part === 2 ? (me().q2 || {}) : {}, ctrls = ['PE', 'LP', 'GC', 'LPE'].filter(k => (q1[k] || q2[k]) > 0);
-    if (!(q1.RT > 0) && ctrls.length) { ui.flash = { ks: ctrls }; clearTimeout(ui.flashT); ui.flashT = setTimeout(() => { ui.flash = null; render(true); }, 6000); }
+    if (!(q1.RT > 0) && ctrls.length) { players[pid]['n' + part] = true; DB.update(BASE + '/players/' + pid, { ['n' + part]: true }); ui.flash = { ks: ctrls }; clearTimeout(ui.flashT); ui.flashT = setTimeout(() => { ui.flash = null; render(true); }, 6000); }
     render(true); }
   function flashHTML() {
     if (!ui.flash) return '';
@@ -153,7 +153,7 @@
     const d = me()['q' + part] || {}, listP = part === 1 ? G.P1 : G.P2;
     return table(`${topBar(closed ? 'SHOP CLOSED' : 'PART ' + part)}${newsBanner()}<div class="mid"><div class="lk">🔒</div><div class="lt">Hand locked</div>
       <div class="ls">${closed ? 'Eyes on the screen.<br>Nova goes live…' : 'Eyes on the screen.<br>The shop closes in'}</div>${!closed && t != null ? `<div class="cd cdi">${fmtT(t)}</div>` : '<div style="height:18px"></div>'}
-      <div class="ls"><span id="lockn">${n}</span> of ${L.length} players locked</div><div class="prog"><i style="width:${L.length ? 100 * n / L.length : 0}%"></i></div>${closed ? '' : '<button class="btn ghost unl" id="unlockb">✏️ Change my hand</button>'}</div>${handHTML(d, listP, 'YOUR HAND')}`);
+      <div class="ls"><span id="lockn">${n}</span> of ${L.length} players locked</div><div class="prog"><i style="width:${L.length ? 100 * n / L.length : 0}%"></i></div>${closed || me()['n' + part] ? '' : '<button class="btn ghost unl" id="unlockb">✏️ Change my hand</button>'}</div>${handHTML(d, listP, 'YOUR HAND')}`);
   }
   function incRow(id, r, q1, q2, delay) {
     const [, e, name, , , ctrl] = G.INC[id]; const h = r.hits.find(x => x.id === id);
@@ -463,7 +463,7 @@
     if (wh) wh.onclick = () => { guard(); DB.update(BASE + '/state/wb', { choice: 'hide' }); SFX.stamp(); buzz(60); toast('🙈 Hidden. Let’s hope it never comes out…'); };
     const bw = document.getElementById('borrow'); if (bw) bw.onclick = borrow;
     const lb = document.getElementById('lockb'); if (lb) lb.onclick = () => { if (guarded()) return; ui.overlay = { t: 'lock' }; guard(); render(true); };
-    const ub = document.getElementById('unlockb'); if (ub) ub.onclick = () => { const part = partOf(); players[pid]['l' + part] = false; DB.update(BASE + '/players/' + pid, { ['l' + part]: false }); guard(); SFX.chip(); render(true); };
+    const ub = document.getElementById('unlockb'); if (ub) ub.onclick = () => { const part = partOf(); if (me()['n' + part]) return; players[pid]['l' + part] = false; DB.update(BASE + '/players/' + pid, { ['l' + part]: false }); guard(); SFX.chip(); render(true); };
     const ly = document.getElementById('lockyes'); if (ly) ly.onclick = lock;
     const ca = document.getElementById('cacc'); if (ca) { ca.onclick = acceptCall; startRing(); }
     const cd = document.getElementById('cdecl'); if (cd) cd.onclick = () => { stopRing(); SFX.chip(); ui.call = { stage: 'mail' }; render(true); };
@@ -648,11 +648,11 @@
         if (VIEW === 'player' && me()) { ui.newsTake = { part, i: rel - 1 }; ui.newsI = rel - 1; guard(); SFX.news(); buzz([90, 60, 90]); }
         if (VIEW === 'board') { ui.bTake = { part, i: rel - 1 }; SFX.news(); clearTimeout(ui.bT); ui.bT = setTimeout(() => { ui.bTake = null; render(true); }, 10000); } }
       if (rel === 0) { ui.newsI = 0; ui.newsTake = null; }
-      render(true); }
-    if (VIEW === 'player') { const w = wbLive(); if (w !== ui.wbOn) { ui.wbOn = w; guard(); if (w) { SFX.heartbeat(2, 0); buzz([200, 100, 200, 100, 200]); } render(true); } }
+      if (['p1', 'p2', 'p1x', 'p2x'].includes(ph())) render(true); }
+    if (VIEW === 'player') { const w = wbLive(); if (w !== ui.wbOn) { ui.wbOn = w; guard(); if (w) { SFX.heartbeat(2, 0); buzz([200, 100, 200, 100, 200]); } if (['p2', 'p2x'].includes(ph())) render(true); } }
   }, 500);
   let lastPhase = null;
-  DB.on(BASE + '/state', s => { state = s || { phase: 'lobby' }; if (lastPhase && lastPhase !== state.phase) { ui.overlay = null; buzz(50); } lastPhase = state.phase; render(); });
+  DB.on(BASE + '/state', s => { state = s || { phase: 'lobby' }; if (lastPhase && lastPhase !== state.phase) { ui.overlay = null; ui.newsTake = null; ui.bTake = null; buzz(50); } lastPhase = state.phase; render(); });
   DB.on(BASE + '/players', s => { players = s || {}; render(); });
   if (VIEW === 'player') DB.on(BASE + '/names', s => { names = s || {}; render(); });
 })();
