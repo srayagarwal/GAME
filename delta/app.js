@@ -61,7 +61,7 @@
     <li><span>💰</span><div><b>€${B0()}k for the whole game.</b> It never refills. Spend it all on project 1 and you can't fix the rest.</div></li>
     <li><span>🔒</span><div>Each project has <b>2 hidden weaknesses</b>. Pay to fix them, or take the risk.</div></li>
     <li><span>🚀</span><div>Launch <b>Small</b> (safe, earns a little), <b>Big</b> (earns a lot, hits hurt ×3) or <b>Pause</b>.</div></li>
-    <li><span>📰</span><div><b>Real AI incidents</b> hit the big screen. Unfixed weaknesses cost money and ⭐.</div></li>
+    <li><span>📰</span><div><b>Real AI incidents</b> break on your phone. Unfixed weaknesses cost money and ⭐.</div></li>
     <li><span>⭐</span><div>Revenue is paid at year end, <b>× your trust</b>. Lose stars, lose sales.</div></li></ul>`; }
   function joinScreen() {
     return `<div class="ph"><div class="logo" style="font-size:18px"><b>Δ</b> DELTA</div>
@@ -93,7 +93,7 @@
         ${viaOther ? '<span class="b">✓ Fixed</span>' : `<button class="b" data-fix="${w}" ${locked ? 'disabled' : ''}>${on ? '✓ Fixed' : 'Fix it'}<br>€${c.cost}k</button>`}</div>`; }).join('');
     if (pr.s) { const s = pr.s === 'pause' ? null : G.SIZE[pr.s];
       return head + `<div class="wk2">${wk}</div><div class="lockd"><div class="e">${s ? s.e : '⏸️'}</div><b>${s ? s.n + ' launch locked in' : 'Project paused'}</b>
-        <div class="hint">${s ? 'Watch the big screen for the news.' : 'Nothing can hit you, but you earn nothing.'}</div>
+        <div class="hint">${s ? 'The news will appear here when the host reveals it.' : 'Nothing can hit you, but you earn nothing.'}</div>
         ${expired ? '' : '<button class="btn gh" id="relaunch">↩︎ Change my decision</button>'}</div>`; }
     if (expired) return head + `<div class="wk2">${wk}</div><div class="lockd"><div class="e">⏰</div><b>Time’s up</b><div class="hint">You didn’t launch, so this project is paused.</div></div>`;
     if (ui.size && ui.size !== 'pause' && r.budget < G.SIZE[ui.size].cost) ui.size = null;
@@ -112,7 +112,7 @@
     if (v.kind === 'wouldHit') return `⏸️ Would have hit you, but you paused`;
     return '✓ Not your risk'; }
   function newsCard(v) { const n = G.N[v.nid];
-    return `<div class="news ${v.kind} new"><div class="src"><span>${esc(n.src)}</span><span>${esc(G.AREAS[n.a])}</span></div><div class="h">${esc(n.h)}</div><span class="v">${verdict(v)}</span></div>`; }
+    return `<div class="news ${v.kind} new"><div class="src"><span>${esc(n.src)}</span><span>${esc(G.AREAS[n.a])}</span></div><div class="h">${esc(n.h)}</div><div class="s">${esc(n.s)}</div><span class="v">${verdict(v)}</span></div>`; }
   function newsScreen(m, r) {
     const R = r.proj[idx()], i = idx();
     const pending = R.hits.find(v => v.kind === 'hit' && !v.resp && !ui.sheetSkip[v.nid]);
@@ -142,7 +142,19 @@
        <div class="rl"><span>Trust</span><b>${R.starsBefore} → ${R.starsAfter} ⭐${R.leaked ? ' (your hidden incident leaked)' : ''}</b></div></div>
       <div class="les">🎯 ${esc(R.lesson || '')}</div>
       ${real.map(v => { const n = G.N[v.nid]; return `<div class="wr"><div class="t">📰 WHAT REALLY HAPPENED</div><div class="h">${esc(n.h)}</div>${esc(n.r)}</div>`; }).join('')}
+      ${phoneBoard()}
       <div class="hint" style="margin-top:14px">${idx() + 1 < len() ? 'Next project coming up…' : 'Final results coming up…'}</div>`;
+  }
+  function phoneBoard() {
+    const i = idx(), rk = ranking(), P = rk.map(x => x.r.proj[i]).filter(Boolean), pos = rk.findIndex(x => x.p.id === pid) + 1, cnt = f => P.filter(f).length;
+    const top = rk.slice(0, 5); if (pos > 5) top.push(rk[pos - 1]);
+    return `<div class="k">The room · project ${i + 1}</div>
+      <div class="res"><div class="rl"><span>🌍 Big · 🧪 Small · ⏸️ Paused</span><b>${cnt(R => R.size === 'big')} · ${cnt(R => R.size === 'small')} · ${cnt(R => !R.size)}</b></div>
+       <div class="rl"><span>⚠️ Hit by the news</span><b>${cnt(R => R.hits.some(v => v.kind === 'hit'))}</b></div>
+       <div class="rl"><span>🤐 Stayed quiet</span><b>${cnt(R => R.hits.some(v => v.kind === 'hit' && v.resp !== 'disc'))}</b></div>
+       ${proj().trap ? `<div class="rl"><span>🚫 Paused the banned system</span><b>${cnt(R => !R.size)} of ${P.length}</b></div>` : ''}</div>
+      <div class="k">Leaderboard · you are #${pos} of ${rk.length}</div>
+      <div class="res">${top.map(x => { const k = rk.indexOf(x) + 1; return `<div class="rl ${x.p.id === pid ? 'me' : ''}"><span>${k}. ${esc(x.p.name)} ${'⭐'.repeat(x.r.stars)}</span><b>${eur(x.r.total)}</b></div>`; }).join('')}</div>`;
   }
   function ranking() { return plist().map(p => ({ p, r: sc(p.id, p) })).sort((a, b) => b.r.total - a.r.total || b.r.stars - a.r.stars); }
   function endScreen(m, r) {
@@ -151,6 +163,7 @@
       <div class="facts"><div><b>${eur(r.total)}</b>final score</div><div><b>${r.stars} ⭐</b>trust</div><div><b>${r.launched}/${len()}</b>launched</div></div>
       <div class="res"><div class="rl"><span>💰 Budget left</span><b>${eur(r.budget)}</b></div><div class="rl"><span>📈 Year end: revenue − damage</span><b class="${r.year >= 0 ? 'pos' : 'neg'}">${sgn(r.year)}</b></div></div>
       ${r.stars === most ? '<div class="award">🌱 Responsible Leader: you kept the most trust</div>' : ''}
+      <div class="k">Final leaderboard</div><div class="res">${rk.slice(0, 10).map((x, k) => `<div class="rl ${x.p.id === pid ? 'me' : ''}"><span>${k + 1}. ${esc(x.p.name)} ${'⭐'.repeat(x.r.stars)}</span><b>${eur(x.r.total)}</b></div>`).join('')}${pos > 10 ? `<div class="rl me"><span>${pos}. ${esc(m.name)}</span><b>${eur(r.total)}</b></div>` : ''}</div>
       <div class="k">Your projects</div><div class="res">${r.proj.map(R => `<div class="mini"><span>${G.ALLP[R.projId].i} ${esc(G.ALLP[R.projId].n)}</span><b class="${R.yearNet - R.spent >= 0 ? 'pos' : 'neg'}">${sgn(R.yearNet - R.spent)}</b></div>`).join('')}</div>
       <div class="lesson">Fixes are cheaper than incidents. Scale multiplies risk. Some systems should never be built. Hiding problems costs more than owning them.</div>`;
   }

@@ -179,3 +179,5 @@ table.lb tr.lead td{background:rgba(242,193,78,.08)}
 .bh{font-family:Fraunces;font-weight:800;font-size:5vh;margin:2.4vh 0 0}
 .stats>div{display:flex;justify-content:space-between;font-size:2.3vh;padding:.9vh 0;border-bottom:1px dashed rgba(255,255,255,.12)}.stats b{color:var(--gold)}
 .realb{margin-top:2vh;background:var(--cream);color:var(--ink);border-radius:1.6vh;padding:1.6vh 2vh;font-size:1.9vh;line-height:1.45}.realb b{font-family:Fraunces}
+.news .s{font-size:12px;color:#5a5548;margin:-2px 0 7px;line-height:1.35}
+.rl.me{background:rgba(242,193,78,.14);border-radius:8px;padding-left:6px;padding-right:6px}.rl.me span{color:var(--gold);font-weight:800}
