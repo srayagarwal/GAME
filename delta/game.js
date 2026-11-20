@@ -42,14 +42,12 @@
     DRIFT: { n: 'Drift monitoring', i: '📈', cost: 10, fix: ['MONITOR'], d: 'Alerts when the model starts going wrong' },
     TRANS: { n: 'Transparency notice', i: '🏷️', cost: 5, fix: ['DISCLOSE'], d: 'Tell people when they are dealing with AI' },
     VULN: { n: 'Vulnerability detection', i: '🔍', cost: 10, fix: ['OSS', 'UNPATCHED'], sec: 1, d: 'Scan models and servers for known flaws (this project)' },
+    TOOL: { n: 'Approved AI tool + leak blocking', i: '🧰', cost: 10, fix: ['SHADOW'], d: 'Staff get a safe AI tool, so they stop pasting data into public chatbots' },
     ACT: { n: 'EU AI Act pack', i: '📑', cost: 15, fix: [], d: 'Technical documentation + fundamental rights assessment. Needed for high-risk inspections' },
   };
   const F = {
     GOV: { n: 'AI governance framework', i: '🏛️', cost: 20, fix: [], d: 'Shows every project’s EU AI Act risk tier. Counts in the EU AI Act inspection' },
     INV: { n: 'AI inventory + named owner', i: '📋', cost: 10, fix: [], d: 'Passes “Board asks: what AI do we run?”. Counts in the EU AI Act inspection' },
-    FVULN: { n: 'Vulnerability detection', i: '🔍', cost: 15, fix: ['OSS', 'UNPATCHED'], sec: 1, d: 'Continuous scanning of models and servers, every project' },
-    LIT: { n: 'AI literacy programme', i: '🎓', cost: 15, fix: ['PAYV'], d: 'Staff spot deepfakes and misuse, every project. EU AI Act Art. 4' },
-    TOOL: { n: 'Approved AI tool + data-leak blocking', i: '🧰', cost: 15, fix: ['SHADOW'], d: 'Staff get a safe AI tool, every project' },
     IRP: { n: 'Incident response plan', i: '🚨', cost: 10, fix: [], d: '“Disclose and fix” is free. Whistleblowers can’t hurt you' },
     INS: { n: 'AI liability insurance', i: '📜', cost: 20, fix: [], wild: 1, d: 'Pays your single biggest damage once. Trust loss still counts. Needs Incident response plan + AI inventory' },
   };
@@ -274,8 +272,8 @@
         v.dmg = base; v.star = SEV[n.sev].star; v.resp = d[nid] || null; return v;
       };
       const cards = [];
-      if (st >= 1) (news.w1 || []).forEach(nid => cards.push(evalCard(nid, 1)));
-      if (st >= 2) (news.w4 || []).forEach(nid => cards.push(evalCard(nid, 2)));
+      // one news step: all four headlines break together (stage 2)
+      if (st >= 2) (news.w1 || []).concat(news.w4 || []).forEach(nid => cards.push(evalCard(nid, 2)));
       cards.forEach(v => {
         if (v.dmg) add(N[v.nid].h, -v.dmg, v.kind === 'partial' ? 'partial' : 'hit');
         if (v.kind === 'hit' && v.star) {

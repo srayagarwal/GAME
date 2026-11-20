@@ -15,7 +15,7 @@
   const stars = n => '⭐'.repeat(Math.max(0, n)) + '<span style="opacity:.25">' + '⭐'.repeat(5 - Math.max(0, n)) + '</span>';
   const starsB = n => '★'.repeat(Math.max(0, n)) + '<i>' + '★'.repeat(5 - Math.max(0, n)) + '</i>';
   const dom = () => G.DOMAINS[state.dom || 'bank'];
-  const len = () => state.len || 6;
+  const len = () => state.len || 4;
   const left = () => Math.max(0, (state.deadline || 0) - DB.now());
   const fmtT = ms => { const s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   const toast = msg => { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2600); };
@@ -73,7 +73,7 @@
       <h2 style="font-size:29px;margin-top:14px">You're the new <em>Head of AI</em> at ${esc(d.org)}.</h2>
       <div class="obj"><div class="t">🎯 YOUR OBJECTIVE</div>Run ${len()} AI projects. Finish with the <b>biggest budget</b> while keeping customers' <b>trust ⭐</b>.</div>
       <div class="k">How it works</div>${rulesList()}
-      <div class="facts"><div><b>€${G.START}k</b>for all ${len()}</div><div><b>⭐×5</b>trust</div><div><b>~${len() * 6} min</b>${len()} projects</div></div>
+      <div class="facts"><div><b>€${G.START}k</b>for all ${len()}</div><div><b>⭐×5</b>trust</div><div><b>~${len() * 5} min</b>${len()} projects</div></div>
       <input class="inp" id="nm" maxlength="14" placeholder="Your name…" autocomplete="off">
       <button class="btn" id="join">Join the game →</button></div>`;
   }
@@ -96,7 +96,7 @@
     if (pr.s0) {
       const s = pr.s0 === 'pause' ? null : G.SIZE[pr.s0];
       return head + `<div class="lockd"><div class="e">${s ? s.e : '⏸️'}</div><b>${s ? s.n + ' launched' : 'Project paused'}</b>
-        <div class="hint">${s ? 'Watch the big screen for Week 1 news.' : 'You won’t earn from this one, but nothing can hit you.'}</div>
+        <div class="hint">${s ? 'Watch the big screen for the news.' : 'You won’t earn from this one, but nothing can hit you.'}</div>
         ${expired ? '' : '<button class="btn gh" id="relaunch">↩︎ Change my decision</button>'}</div>`;
     }
     if (expired) return head + `<div class="lockd"><div class="e">⏰</div><b>Time’s up</b><div class="hint">You didn’t launch, so this project is paused. Only the €${G.BUILD}k build cost is charged.</div></div>`;
@@ -131,7 +131,7 @@
       <div class="k">Choose how big to launch (+ €${G.BUILD}k build cost) · tap again to unselect</div>
       ${G.ORDER.map(opt).join('')}
       <button class="lc pa ${sel === 'pause' ? 'on' : ''}" data-size="pause"><span class="e">⏸️</span><div><div class="nm">Pause</div><div class="s">Don't launch this one</div></div><div class="r">Lose <b>€${G.BUILD}k</b>build cost only</div></button>
-      <div class="hint">After the news you can expand or pause, and you can undo that until the next headline.</div>
+      <div class="hint">After the news you can expand or pause, and you can undo that until Month 3.</div>
       <button class="btn" id="go" ${sel ? '' : 'disabled'}>${sel ? (sel === 'pause' ? 'Pause this project ⏸️' : 'Launch ' + G.SIZE[sel].n + ' ' + G.SIZE[sel].e) : 'Choose a launch size'}</button>`;
   }
   // ---- news ----
@@ -162,7 +162,7 @@
         <div class="row3"><button data-dec="stay" class="${!cur ? 'on' : ''}">Stay<small>keep going</small></button>
         <button data-dec="${nxt || ''}" class="${cur && cur === nxt ? 'on' : ''}" ${nxt && (cur === nxt || r.budget >= diff) ? '' : 'disabled'}>⬆️ Expand<small>${nxt ? G.SIZE[nxt].n + ' · €' + diff + 'k' : 'already max'}</small></button>
         <button data-dec="pause" class="pz ${cur === 'pause' ? 'on' : ''}">⏸️ Pause<small>half launch cost back</small></button></div>
-        <div class="hint">${cur ? 'Changed your mind? Tap it again (or Stay) to undo. ' : ''}${stage === 1 ? 'Week 4 news comes next.' : 'Month 3 comes next: the regulator and the press.'}</div>`;
+        <div class="hint">${cur ? 'Changed your mind? Tap it again (or Stay) to undo. ' : ''}Month 3 comes next: the regulator and the press.</div>`;
     } else decide = `<div class="lockd"><div class="e">⏸️</div><b>Your project is paused</b><div class="hint">News can’t hurt you, but you won’t earn from it.</div></div>`;
     const pending = R.hits.find(v => v.kind === 'hit' && v.star && !v.resp && v.stage === stage && !ui.sheetSkip[v.nid]);
     let sheet = '';
@@ -172,7 +172,7 @@
         <button class="opt g" data-resp="disc" data-nid="${pending.nid}"><b>📢 Disclose and fix</b><div>${irp ? 'Free with your Incident response plan.' : 'Pay €10k.'} Tell customers, fix it. You keep your ⭐.</div></button>
         <button class="opt r" data-resp="quiet" data-nid="${pending.nid}"><b>🤐 Stay quiet</b><div>Free. 50% chance it leaks in Month 3: −2 ⭐ and your name on the big screen.</div></button>
         <div class="hint" style="color:#8a8170">Decide nothing and you lose 1 ⭐.</div></div></div>`; }
-    return `<div class="k">📰 ${stage === 1 ? 'Week 1' : 'Week 4'} news · does it affect you?</div>
+    return `<div class="k">📰 The news · does it affect you?</div>
       ${cards.map(v => newsCard(v, v.stage === stage)).join('')}${decide}${sheet}`;
   }
   // ---- results ----
@@ -206,7 +206,7 @@
 
   // ================= BOARD =================
   function bTop(right) { return `<div class="bbar"><span class="blogo"><b>Δ</b> DELTA</span>${right ? `<span class="bpl">${right}</span>` : ''}</div>`; }
-  function timeline(on) { const it = [['① Fix and launch', 'Buy controls, choose size'], ['② Week 1 news', '3 headlines'], ['③ Week 4 news', '1 headline'], ['④ Month 3', 'Regulator and press'], ['⑤ Results', 'What really happened']];
+  function timeline(on) { const it = [['① Fix and launch', 'Buy controls, choose size'], ['② The news', '4 headlines'], ['③ Month 3', 'Regulator and press'], ['④ Results', 'What really happened']];
     return `<div class="tl">${it.map((x, k) => `<div class="${k < on ? 'dn' : k === on ? 'on' : ''}">${x[0]}<small>${x[1]}</small></div>`).join('')}</div>`; }
   function board() {
     const p = ph(); let inner = '';
@@ -228,14 +228,14 @@
        <div class="st"><div class="n">1</div><div class="h">📱 Get a project</div><div class="d">You see 2 hidden weaknesses that only you know about</div></div>
        <div class="st"><div class="n">2</div><div class="h">🛡️ Fix weak spots</div><div class="d">Buy controls. Each one fixes one weakness</div></div>
        <div class="st"><div class="n">3</div><div class="h">🚀 Launch or pause</div><div class="d">Pilot, Rollout or Go big. Bigger earns more and risks more</div></div>
-       <div class="st"><div class="n">4</div><div class="h">📰 The news breaks</div><div class="d">Real-world incidents in Week 1 and Week 4. Do they hit you?</div></div>
+       <div class="st"><div class="n">4</div><div class="h">📰 The news breaks</div><div class="d">Four real-world incidents break. Do they hit you?</div></div>
        <div class="st"><div class="n">5</div><div class="h">🏛️ Month 3</div><div class="d">The regulator and the press check in. Then results</div></div></div>
       <div class="two">
        <div class="bx"><div class="t">🏆 HOW TO WIN</div><ul><li><b>One €${G.START}k budget for all ${len()} projects</b>: about €${Math.round(G.START / len())}k each. Spend it all on project 1 and you can't launch the rest</li><li>Most <b>€ budget</b> after ${len()} projects wins</li><li>Your revenue is multiplied by your <b>⭐ trust</b>, so lost trust means lost sales</li><li>🌱 <b>Responsible Leader</b> award for the most ⭐ left</li></ul></div>
        <div class="bx"><div class="t">⚠️ GOOD TO KNOW</div><ul><li>Every headline is based on <b>a real AI incident</b></li><li>Some projects are <b>illegal under the EU AI Act</b>. Spot them and pause</li><li>Hit by an incident? <b>Disclose</b> it or <b>stay quiet</b>, but whistleblowers exist</li></ul></div></div>
      </div><div class="side">
       <div class="qr"><div class="u">Scan to join</div>${qrSVG(joinURL())}<div class="u">${esc(joinURL().replace(/^https?:\/\//, ''))}</div><div class="s">Room: ${esc(ROOM)}</div></div>
-      <div class="bfacts">💰 <b>€${G.START}k</b> for all ${len()} projects · <b>⭐⭐⭐⭐⭐</b><br>⏱️ About <b>${len() * 6} minutes</b> · ${len()} projects<br>👤 Play solo on your phone<br>🎓 No AI or poker knowledge needed</div>
+      <div class="bfacts">💰 <b>€${G.START}k</b> for all ${len()} projects · <b>⭐⭐⭐⭐⭐</b><br>⏱️ About <b>${len() * 5} minutes</b> · ${len()} projects<br>👤 Play solo on your phone<br>🎓 No AI or poker knowledge needed</div>
       <div class="joined"><div class="t">${L.length} PLAYER${L.length === 1 ? '' : 'S'} JOINED</div><div class="chips">${L.map(x => `<span>${esc(x.name)}</span>`).join('')}</div></div>
      </div></div>`;
   }
@@ -255,11 +255,11 @@
   function bNews() {
     const i = idx(), nw = (state.news || {})[i] || {}, p = proj(), w4 = ph() === 'w4';
     const key = 'n' + i + ph(), anim = !ui.seen[key]; ui.seen[key] = 1;
-    if (anim) setTimeout(() => (w4 ? [0.2] : [0.3, 1.5, 2.7]).forEach(t => setTimeout(() => window.SFX && SFX.news && SFX.news(), t * 1000)), 10);
-    const body = !w4 ? `<div class="nw">${(nw.w1 || []).map((id, k) => paper(id, k, { brk: 1, week: 'Week 1', delay: anim ? 0.3 + k * 1.2 : 0, still: !anim })).join('')}</div>`
-      : `${paper(nw.w4[0], 0, { brk: 1, week: 'Week 4', cls: 'big', delay: anim ? 0.2 : 0, still: !anim })}<div class="olds">${(nw.w1 || []).map((id, k) => paper(id, k, { week: 'Week 1', small: 1, still: 1 })).join('')}</div>`;
-    return `${bTop(`📰 ${w4 ? 'WEEK 4' : 'WEEK 1'} · ${esc(p.n.toUpperCase())}`)}${body}
-      <div class="ask">Does this affect <span>your</span> ${esc(p.n.toLowerCase())}?<small>Check your phone: stay, expand or pause.</small></div>${timeline(w4 ? 2 : 1)}`;
+    const all = (nw.w1 || []).concat(nw.w4 || []);
+    if (anim) setTimeout(() => all.forEach((x, k) => setTimeout(() => window.SFX && SFX.news && SFX.news(), (0.3 + k * 1.1) * 1000)), 10);
+    const body = `<div class="nw nw4">${all.map((id, k) => paper(id, k, { brk: 1, week: k === all.length - 1 ? 'Top story' : 'This month', delay: anim ? 0.3 + k * 1.1 : 0, still: !anim })).join('')}</div>`;
+    return `${bTop(`📰 THE NEWS · ${esc(p.n.toUpperCase())}`)}${body}
+      <div class="ask">Does this affect <span>your</span> ${esc(p.n.toLowerCase())}?<small>Check your phone: stay, expand or pause.</small></div>${timeline(1)}`;
   }
   function lbTable(rk, title) { return `<div class="bk" style="margin-top:0">${title}</div><table class="lb"><tr><th></th><th>PLAYER</th><th>TRUST</th><th style="text-align:right">BUDGET</th></tr>
     ${rk.slice(0, 10).map((x, k) => `<tr class="${k === 0 ? 'lead' : ''}"><td class="n">${k + 1}</td><td>${esc(x.p.name)}</td><td class="s">${starsB(x.r.stars)}</td><td class="b">${eur(x.r.budget)}</td></tr>`).join('')}</table>`; }
@@ -277,7 +277,7 @@
       ${m3hit.length ? `<div class="wbn"><div class="t">CAUGHT BY ${esc(M.n.toUpperCase())}</div><div class="h">${m3hit.slice(0, 8).map(esc).join(', ')}${m3hit.length > 8 ? ' +' + (m3hit.length - 8) : ''}</div></div>` : ''}
       ${proj().trap ? `<div class="okb">🚫 This was a <b>prohibited</b> system under the EU AI Act. ${paused} of ${rk.length} players paused it.</div>` : ''}
       ${most ? `<div class="okb">🌱 Most trusted so far: <b>${esc(most.p.name)}</b> (${most.r.stars} ⭐)</div>` : ''}
-     </div><div>${lbTable(rk, `LEADERBOARD · AFTER ${i + 1} OF ${len()} PROJECTS`)}</div></div>${timeline(4)}`;
+     </div><div>${lbTable(rk, `LEADERBOARD · AFTER ${i + 1} OF ${len()} PROJECTS`)}</div></div>${timeline(2)}`;
   }
   function bEnd() {
     const rk = ranking(), top = rk.slice(0, 3), most = rk.slice().sort((a, b) => b.r.stars - a.r.stars || b.r.budget - a.r.budget)[0];
@@ -293,11 +293,11 @@
   // ================= HOST =================
   function host() {
     const p = ph(), L = plist(), i = idx();
-    const next = { lobby: ['▶ Start the game', 'start'], deal: ['📰 Reveal Week 1 news', 'w1'], w1: ['📰 Reveal Week 4 news', 'w4'], w4: ['🏛️ Month 3 + results', 'm3'],
+    const next = { lobby: ['▶ Start the game', 'start'], deal: ['📰 Reveal the news', 'w4'], w1: ['📰 Reveal the news', 'w4'], w4: ['🏛️ Month 3 + results', 'm3'],
       m3: i + 1 < len() ? ['➡️ Next project (' + (i + 2) + ' of ' + len() + ')', 'next'] : ['🏆 Final results', 'end'], end: ['Game over', ''] }[p];
     const setup = p === 'lobby' ? `<div class="hcard"><h3>1 · CHOOSE THE SECTOR</h3><div class="doms">${G.DKEYS.map(k => { const d = G.DOMAINS[k];
         return `<button class="dm ${state.dom === k ? 'on' : ''}" data-dom="${k}"><div class="i">${d.i}</div><div class="n">${esc(d.n)}</div><div class="d">${esc(d.blurb)}</div></button>`; }).join('')}</div></div>
-      <div class="hcard"><h3>2 · GAME LENGTH</h3><div class="seg">${[4, 6, 8].map(n => `<button data-len="${n}" class="${len() === n ? 'on' : ''}">${n} projects · ~${n * 6} min</button>`).join('')}</div>
+      <div class="hcard"><h3>2 · GAME LENGTH</h3><div class="seg">${[3, 4, 6].map(n => `<button data-len="${n}" class="${len() === n ? 'on' : ''}">${n} projects · ~${n * 5} min</button>`).join('')}</div>
        <h3 style="margin-top:14px">TIME TO FIX AND LAUNCH, PER PROJECT</h3><div class="seg">${[1.5, 2, 3, 4].map(n => `<button data-min="${n}" class="${(state.shopMin || CFG.shopMinutes || 2) === n ? 'on' : ''}">${n} min</button>`).join('')}</div></div>` : '';
     const counts = p === 'deal' ? `${L.filter(x => ((x.pr || {})[i] || {}).s0).length} of ${L.length} decided` : '';
     return `<div class="host"><div class="logo" style="font-size:20px"><b>Δ</b> DELTA · host</div>
@@ -308,7 +308,7 @@
        ${p === 'lobby' && !state.dom ? '<div class="hint">Choose a sector first.</div>' : ''}
        ${p === 'deal' ? '<div class="hrow"><button id="plus">+1 minute</button></div>' : ''}</div>
       ${p !== 'lobby' && p !== 'end' ? `<div class="hcard hst"><h3>THIS PROJECT</h3>${proj().i} <b>${esc(proj().n)}</b> · tier ${G.TIER[proj().tier]}${proj().trap ? ' · <b>TRAP</b>' : ''}<br>
-        Week 1: ${((state.news || {})[i] || {}).w1.map(id => esc(G.N[id].h)).join(' · ')}<br>Week 4: ${esc(G.N[((state.news || {})[i] || {}).w4[0]].h)}</div>` : ''}
+        News: ${((state.news || {})[i] || {}).w1.concat(((state.news || {})[i] || {}).w4).map(id => esc(G.N[id].h)).join(' · ')}</div>` : ''}
       <div class="hcard"><h3>PLAYERS</h3><div class="hpl">${ranking().map(x => `<div>${esc(x.p.name)} <span>${eur(x.r.budget)} · ${x.r.stars}⭐</span></div>`).join('') || '<span class="hint">Nobody yet</span>'}</div></div>
       <div class="hcard"><h3>LINKS</h3><div class="hrow"><a href="${esc(location.pathname + '?board' + (ROOM !== (CFG.room || 'dnb') ? '&room=' + ROOM : ''))}" target="_blank">📽️ Open projector view</a><a href="${esc(joinURL())}" target="_blank">📱 Player link</a>
         <button class="warn" id="reset">${ui.hostConfirm ? '⚠️ Tap again to wipe this room' : '♻️ Reset game'}</button></div></div></div>`;
@@ -321,7 +321,7 @@
       const n0 = G.drawNews(seed, 0, projects[0], pids, []);
       return DB.set(BASE + '/state', Object.assign({}, state, { len: len(), phase: 'deal', seed, projects, idx: 0, news: { 0: n0 }, deadline: now + min * 60000, t: now }));
     }
-    if (p === 'deal') return upd('/state', { phase: 'w1', t: now });
+    if (p === 'deal') return upd('/state', { phase: 'w4', t: now });
     if (p === 'w1') return upd('/state', { phase: 'w4', t: now });
     if (p === 'w4') { const i = idx(), anyQuiet = plist().some(x => Object.values((((x.pr || {})[i] || {}).d) || {}).includes('quiet'));
       return upd('/state', { phase: 'm3', t: now, ['news/' + i + '/m3']: G.drawM3(state.seed, i, projId(), anyQuiet) }); }
