@@ -4,13 +4,15 @@
   function hash(s) { let h = 2166136261; s = String(s); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } h ^= h >>> 13; h = Math.imul(h, 2246822507); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
   const shuffle = (arr, seed) => arr.map((x, i) => [hash(seed + ':' + i + ':' + x), x]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
 
-  // ---------- money ----------
-  const START = 300, BUILD = 10;
-  const SIZE = { pilot: { n: 'Pilot', e: '🧪', cost: 10, earn: 40, mult: 0.5, s: 'A few hundred customers' },
-    roll: { n: 'Rollout', e: '🚀', cost: 30, earn: 110, mult: 1, s: 'All customers in one country' },
-    big: { n: 'Go big', e: '🌍', cost: 60, earn: 240, mult: 2, s: 'Every market, day one' } };
-  const ORDER = ['pilot', 'roll', 'big'];
-  const SEV = { minor: { n: 'Minor', dmg: 20, star: 0 }, major: { n: 'Major', dmg: 50, star: 1 }, critical: { n: 'Critical', dmg: 100, star: 1 } };
+  // ---------- money (simple version) ----------
+  // One budget for the whole game that never refills. Revenue and damage land "at year end".
+  const PER = 25;                                   // budget = €25k per project in the game
+  const budgetFor = len => PER * (len || 4);
+  const SIZE = { small: { n: 'Small', e: '🧪', cost: 5, earn: 30, mult: 1, s: 'A few hundred customers' },
+    big: { n: 'Big', e: '🌍', cost: 20, earn: 90, mult: 3, s: 'Every customer, day one' } };
+  const ORDER = ['small', 'big'];
+  const SEV = { minor: { n: 'Minor', dmg: 10 }, major: { n: 'Major', dmg: 20 }, critical: { n: 'Critical', dmg: 30 } };
+  const DISCLOSE = 10, TRAPFINE = { small: 30, big: 60 };
 
   // ---------- weaknesses (hidden cards) ----------
   const W = {
@@ -45,12 +47,7 @@
     TOOL: { n: 'Approved AI tool + leak blocking', i: '🧰', cost: 10, fix: ['SHADOW'], d: 'Staff get a safe AI tool, so they stop pasting data into public chatbots' },
     ACT: { n: 'EU AI Act pack', i: '📑', cost: 15, fix: [], d: 'Technical documentation + fundamental rights assessment. Needed for high-risk inspections' },
   };
-  const F = {
-    GOV: { n: 'AI governance framework', i: '🏛️', cost: 20, fix: [], d: 'Shows every project’s EU AI Act risk tier. Counts in the EU AI Act inspection' },
-    INV: { n: 'AI inventory + named owner', i: '📋', cost: 10, fix: [], d: 'Passes “Board asks: what AI do we run?”. Counts in the EU AI Act inspection' },
-    IRP: { n: 'Incident response plan', i: '🚨', cost: 10, fix: [], d: '“Disclose and fix” is free. Whistleblowers can’t hurt you' },
-    INS: { n: 'AI liability insurance', i: '📜', cost: 20, fix: [], wild: 1, d: 'Pays your single biggest damage once. Trust loss still counts. Needs Incident response plan + AI inventory' },
-  };
+  const FIX = {}; Object.keys(W).forEach(w => { const k = Object.keys(C).find(k => C[k].fix.includes(w) && !C[k].sec) || Object.keys(C).find(k => C[k].fix.includes(w)); FIX[w] = k; });
 
   // ---------- news cards (all based on real events) ----------
   const AREAS = { hal: '🤥 Hallucination', sec: '🔓 Security', pri: '🔐 Privacy', fair: '⚖️ Fairness', safe: '🦺 Safety', fake: '🎭 Deepfake', ops: '📉 Drift, IP & transparency' };
@@ -111,17 +108,6 @@
       r: 'In December 2023 The New York Times sued OpenAI and Microsoft, saying millions of its articles were used to train AI without permission.' },
     SI: { a: 'ops', w: 'DISCLOSE', sev: 'minor', src: 'MEDIA WATCH', h: 'Magazine caught publishing articles by fake AI “writers”', s: 'The authors’ photos were AI-generated too.',
       r: 'In 2023 Sports Illustrated was found publishing product reviews under fake, AI-generated author profiles.' },
-  };
-
-  // ---------- Month 3 cards ----------
-  const M3 = {
-    INSPECT: { i: '🇪🇺', n: 'EU AI Act inspection', d: 'High-risk systems still live are checked: Human in the loop, EU AI Act pack, governance framework, AI inventory. −€20k for each one missing.' },
-    PROHIB: { i: '🚫', n: 'Prohibited practice', d: 'This system is banned under the EU AI Act. Anyone who launched it loses 40% of their budget.' },
-    DPA: { i: '🔐', n: 'Data protection authority audit', d: 'Live systems using personal data without a DPIA: −€40k.' },
-    JOURNAL: { i: '🔎', n: 'Journalist tests your AI for bias', d: 'Live systems with an unfixed bias weakness make the news: −1 ⭐.' },
-    WHISTLE: { i: '📣', n: 'Whistleblower contacts the press', d: 'Everyone who chose “Stay quiet” this project is exposed: −2 ⭐ each.' },
-    BOARD: { i: '📋', n: 'Board asks: what AI do we run?', d: 'Anyone without an AI inventory + named owner: −1 ⭐.' },
-    QUIET: { i: '🌤️', n: 'Quiet quarter', d: 'Nothing happens. Good governance often looks like this.' },
   };
 
   // ---------- domains and projects ----------
@@ -196,137 +182,75 @@
   // two hidden weaknesses per player per project (deterministic, so no writes needed)
   function dealt(seed, pid, idx, projId) { const pool = ALLP[projId].w; return shuffle(pool, seed + ':' + pid + ':' + idx).slice(0, 2); }
 
-  // choose 4 news cards (3 for Week 1, 1 for Week 4) for a project
+  // three headlines per project: two about this kind of system (at least one hits someone), one from elsewhere
   function drawNews(seed, idx, projId, pids, used) {
-    used = used || []; const proj = ALLP[projId], pool = proj.w;
-    const hit = new Set(); pids.forEach(pid => dealt(seed, pid, idx, projId).forEach(w => hit.add(w)));
-    const ids = Object.keys(N), usedAreas = new Set(used.map(id => N[id].a));
-    const sc = id => hash(seed + ':n:' + idx + ':' + id) + (used.includes(id) ? -2 : 0) + (usedAreas.has(N[id].a) ? 0 : 0.35);
+    used = used || []; const pool = ALLP[projId].w;
+    const hit = new Set(); (pids || []).forEach(pid => dealt(seed, pid, idx, projId).forEach(w => hit.add(w)));
+    const ids = Object.keys(N), sc = id => hash(seed + ':n:' + idx + ':' + id) - (used.includes(id) ? 2 : 0);
     const on = ids.filter(id => pool.includes(N[id].w)).sort((a, b) => sc(b) - sc(a));
     const off = ids.filter(id => !pool.includes(N[id].w)).sort((a, b) => sc(b) - sc(a));
-    let pick = on.slice(0, 3);
-    if (pids.length && !pick.some(id => hit.has(N[id].w))) { const h = on.find(id => hit.has(N[id].w)); if (h) pick[2] = h; }
-    while (pick.length < 3 && off.length) pick.push(off.shift());
-    const noise = off.find(id => !pick.includes(id));
-    // Week 4 gets the most severe on-topic card; the off-topic card goes in Week 1
-    const rank = { critical: 3, major: 2, minor: 1 };
-    pick.sort((a, b) => rank[N[b].sev] - rank[N[a].sev] || sc(b) - sc(a));
-    const w4 = pick[0], w1 = shuffle(pick.slice(1).concat(noise ? [noise] : []), seed + 'w1' + idx);
-    return { w1, w4: [w4] };
-  }
-  function drawM3(seed, idx, projId, anyQuiet) {
-    const p = ALLP[projId]; if (p.trap) return 'PROHIB';
-    const opts = [];
-    if (p.tier === 'high') opts.push(['INSPECT', 5]);
-    if (p.pd) opts.push(['DPA', 4]);
-    if (anyQuiet) opts.push(['WHISTLE', 4]);
-    if (p.w.includes('BIAS')) opts.push(['JOURNAL', 3]);
-    opts.push(['BOARD', 2]); opts.push(['QUIET', p.tier === 'high' ? 1 : 3]);
-    const tot = opts.reduce((a, o) => a + o[1], 0); let r = hash(seed + ':m3:' + idx) * tot;
-    for (const o of opts) { r -= o[1]; if (r < 0) return o[0]; } return 'QUIET';
+    const pick = on.slice(0, 2);
+    if (hit.size && !pick.some(id => hit.has(N[id].w))) { const h = on.find(id => hit.has(N[id].w)); if (h) pick[1] = h; }
+    while (pick.length < 2 && off.length) pick.push(off.shift());
+    const noise = off.find(id => !pick.includes(id)); if (noise) pick.push(noise);
+    return { h: shuffle(pick, seed + 'h' + idx) };
   }
 
   // ---------- scoring ----------
-  // stage reached for project i: 0 = shop, 1 = week 1 news shown, 2 = week 4 shown, 3 = month 3 + results
-  function stageOf(state, i) { const cur = state.idx || 0; if (i < cur) return 3; if (i > cur) return -1;
-    return { deal: 0, w1: 1, w4: 2, m3: 3, end: 3 }[state.phase] ?? -1; }
-  const ownsF = (pl, k, i) => pl.f && pl.f[k] != null && pl.f[k] <= i;
+  // stage for project i: 0 = deciding, 1 = news shown, 2 = results shown
+  function stageOf(state, i) { const cur = state.idx || 0; if (i < cur) return 2; if (i > cur) return -1;
+    return { deal: 0, news: 1, res: 2, end: 2 }[state.phase] ?? -1; }
 
-  // returns everything the screens need, for one player
   function score(state, pid, pl) {
-    pl = pl || {}; const seed = state.seed, projs = state.projects || [], out = { budget: START, stars: 5, proj: [], insUsed: null, launched: 0, paused: 0 };
-    let budget = START, stars = 5, insUsed = false;
-    const fCost = Object.keys(pl.f || {}).reduce((a, k) => a + (F[k] ? F[k].cost : 0), 0); budget -= fCost;
+    pl = pl || {}; const seed = state.seed, projs = state.projects || [], START = budgetFor(state.len);
+    let budget = START, year = 0, stars = 5; const out = { start: START, proj: [], launched: 0, paused: 0, hits: 0, quiet: 0, disclosed: 0 };
     for (let i = 0; i < projs.length; i++) {
       const st = stageOf(state, i); if (st < 0) break;
-      const projId = projs[i], proj = ALLP[projId], pr = (pl.pr && pl.pr[i]) || {}, c = pr.c || {}, d = pr.d || {};
-      const news = (state.news && state.news[i]) || {}, my = dealt(seed, pid, i, projId);
-      const R = { i, projId, lines: [], hits: [], net: 0, live: false, paused: null, size: null, m3: null, insurance: 0, starsBefore: stars };
-      const add = (txt, v, kind) => { v = Math.round(v * 10) / 10; R.lines.push({ txt, v, kind }); budget = Math.round((budget + v) * 10) / 10; R.net = Math.round((R.net + v) * 10) / 10; };
-      const ctlCost = Object.keys(c).reduce((a, k) => a + (C[k] ? C[k].cost : 0), 0);
-      if (ctlCost) add('Controls: ' + Object.keys(c).map(k => C[k].i + ' ' + C[k].n).join(', '), -ctlCost, 'ctl');
-      const s0 = pr.s0 || null;
-      if (st >= 1 || s0) add(s0 && s0 !== 'pause' ? 'Build cost' : 'Build cost (paused before launch)', -BUILD, 'build');
-      // sizes over time
-      const sizes = [s0 && s0 !== 'pause' ? s0 : null];
-      sizes[1] = sizes[0] && st >= 2 ? (pr.s1 === 'pause' ? null : (pr.s1 || sizes[0])) : sizes[0];
-      sizes[2] = sizes[1] && st >= 3 ? (pr.s2 === 'pause' ? null : (pr.s2 || sizes[1])) : sizes[1];
-      const maxSize = [sizes[0], sizes[1], sizes[2]].filter(Boolean).sort((a, b) => ORDER.indexOf(b) - ORDER.indexOf(a))[0];
-      if (sizes[0]) { add(SIZE[maxSize].e + ' ' + SIZE[maxSize].n + ' launch', -SIZE[maxSize].cost, 'launch'); out.launched++; }
-      const pausedAt = sizes[0] && !sizes[1] && st >= 2 ? 'w1' : sizes[1] && !sizes[2] && st >= 3 ? 'w4' : (!sizes[0] && (st >= 1 || s0 === 'pause')) ? 'pre' : null;
-      if (pausedAt) { R.paused = pausedAt; out.paused++; if (pausedAt !== 'pre') add('⏸️ Paused after news: half your launch cost back', SIZE[maxSize].cost / 2, 'refund'); }
-      R.size = sizes[Math.min(st, 2)] || null; R.live = !!R.size && st >= 0;
-      // covered?
-      const fixes = w => { const by = []; Object.keys(c).forEach(k => { if (C[k] && C[k].fix.includes(w)) by.push(C[k]); });
-        Object.keys(F).forEach(k => { if (ownsF(pl, k, i) && F[k].fix.includes(w)) by.push(F[k]); }); return by; };
-      const evalCard = (nid, stage) => {
-        const n = N[nid], live = sizes[stage - 1]; const mine = my.includes(n.w);
-        const v = { nid, stage, mine, live: !!live, kind: 'safe', dmg: 0, star: 0 };
-        if (!mine) return v;
-        const by = fixes(n.w);
-        if (by.length) { const full = by.some(x => !x.sec) || !!c.RT; if (full) { v.kind = 'blocked'; v.by = by[0]; return v; } v.kind = 'partial'; v.by = by[0]; }
-        else v.kind = 'hit';
-        if (!live) { v.kind = v.kind === 'partial' ? 'wouldPartial' : 'wouldHit'; v.would = SEV[n.sev].dmg * SIZE[sizes[0] || maxSize || 'roll'].mult; return v; }
-        const base = SEV[n.sev].dmg * SIZE[live].mult;
-        if (v.kind === 'partial') { v.dmg = base * 0.25; return v; }
-        v.dmg = base; v.star = SEV[n.sev].star; v.resp = d[nid] || null; return v;
-      };
-      const cards = [];
-      // one news step: all four headlines break together (stage 2)
-      if (st >= 2) (news.w1 || []).concat(news.w4 || []).forEach(nid => cards.push(evalCard(nid, 2)));
-      cards.forEach(v => {
-        if (v.dmg) add(N[v.nid].h, -v.dmg, v.kind === 'partial' ? 'partial' : 'hit');
-        if (v.kind === 'hit' && v.star) {
-          const resolved = st > v.stage; // the decision window for this card has closed
-          if (v.resp === 'disc') { const cost = ownsF(pl, 'IRP', i) ? 0 : 10; if (cost) add('📢 Disclosed and fixed', -cost, 'disc'); else R.lines.push({ txt: '📢 Disclosed and fixed (free with your Incident response plan)', v: 0, kind: 'disc' }); }
-          else if (v.resp === 'quiet') { v.leakRoll = hash(seed + ':leak:' + pid + ':' + i + ':' + v.nid) < 0.5; }
-          else if (resolved) { stars -= 1; v.starLost = 1; }
+      const projId = projs[i], proj = ALLP[projId], pr = (pl.pr && pl.pr[i]) || {}, fx = pr.f || {}, d = pr.d || {};
+      const my = dealt(seed, pid, i, projId), news = ((state.news || {})[i] || {}).h || [];
+      const R = { i, projId, my, now: [], year: [], hits: [], size: null, paused: false, trap: proj.trap, starsBefore: stars, spent: 0, yearNet: 0 };
+      const spend = (txt, v) => { budget -= v; R.spent += v; R.now.push({ txt, v: -v }); };
+      const book = (txt, v) => { year += v; R.yearNet += v; R.year.push({ txt, v }); };
+      // one control can fix both weaknesses; it is paid for once
+      const ctl = [...new Set(my.filter(w => fx[w]).map(w => FIX[w]))], isFixed = w => ctl.includes(FIX[w]);
+      ctl.forEach(k => spend(C[k].i + ' Fixed: ' + C[k].n.toLowerCase(), C[k].cost));
+      const size = pr.s && pr.s !== 'pause' ? pr.s : null;
+      if (size) { spend(SIZE[size].e + ' ' + SIZE[size].n + ' launch', SIZE[size].cost); out.launched++; }
+      R.size = size; R.paused = !size && (pr.s === 'pause' || st >= 1); if (R.paused) out.paused++;
+      if (st >= 1) news.forEach(nid => {
+        const n = N[nid], v = { nid, kind: 'safe', dmg: 0 };
+        if (my.includes(n.w)) {
+          if (isFixed(n.w)) { v.kind = 'blocked'; v.by = C[FIX[n.w]]; }
+          else if (!size) { v.kind = 'wouldHit'; v.would = SEV[n.sev].dmg * SIZE.big.mult; }
+          else { v.kind = 'hit'; v.dmg = SEV[n.sev].dmg * SIZE[size].mult; v.resp = d[nid] || null; stars -= 1; out.hits++;
+            book('⚠️ Damage: ' + W[n.w].toLowerCase(), -v.dmg);
+            if (v.resp === 'disc') { const fromB = Math.min(DISCLOSE, Math.max(0, budget)); if (fromB) spend('📢 Disclosed the incident', fromB); if (DISCLOSE - fromB) book('📢 Disclosed the incident', -(DISCLOSE - fromB)); out.disclosed++; } }
         }
         R.hits.push(v);
       });
-      // Month 3
-      if (st >= 3) {
-        const m3 = news.m3 || 'QUIET'; R.m3 = { id: m3, lines: [] };
-        const m3add = (txt, v) => { R.m3.lines.push(txt); if (v) add(txt, v, 'm3'); };
-        const live = !!sizes[2];
-        if (m3 === 'PROHIB' && sizes[0]) { const fine = Math.round(Math.max(0, budget) * 0.4 * 10) / 10; m3add('🚫 Launched a prohibited system: 40% of your budget', -fine); R.m3.hit = 1; }
-        if (m3 === 'INSPECT' && live && proj.tier === 'high') {
-          const chk = [['Human in the loop', !!c.HITL], ['EU AI Act pack', !!c.ACT], ['AI governance framework', ownsF(pl, 'GOV', i)], ['AI inventory + named owner', ownsF(pl, 'INV', i)]];
-          R.m3.check = chk; const miss = chk.filter(x => !x[1]).length; if (miss) { m3add('🇪🇺 EU AI Act inspection: ' + miss + ' of 4 missing', -20 * miss); R.m3.hit = 1; }
-        }
-        if (m3 === 'DPA' && live && proj.pd && !c.DPIA) { m3add('🔐 Data protection audit: no DPIA', -40); R.m3.hit = 1; }
-        if (m3 === 'JOURNAL' && live && my.includes('BIAS') && !c.BIAS) { stars -= 1; R.m3.lines.push('🔎 Journalist exposes your bias: −1 ⭐'); R.m3.hit = 1; R.m3.star = 1; }
-        if (m3 === 'BOARD' && !ownsF(pl, 'INV', i)) { stars -= 1; R.m3.lines.push('📋 You couldn’t tell the board what AI you run: −1 ⭐'); R.m3.hit = 1; R.m3.star = 1; }
-        // quiet choices: leak by chance, or all of them if a whistleblower appears
-        R.hits.filter(v => v.resp === 'quiet').forEach(v => {
-          const leaked = m3 === 'WHISTLE' ? !ownsF(pl, 'IRP', i) : v.leakRoll;
-          v.leaked = leaked; if (leaked) { stars -= 2; R.leaked = (R.leaked || 0) + 1; R.m3.lines.push('🤐 Your hidden incident leaked: −2 ⭐'); }
-        });
-        stars = Math.max(0, Math.min(5, stars));
-        // insurance pays the biggest hit once
-        if (!insUsed && ownsF(pl, 'INS', i)) { const big = R.hits.filter(v => v.dmg).sort((a, b) => b.dmg - a.dmg)[0];
-          if (big) { insUsed = i; R.insurance = big.dmg; add('📜 AI liability insurance pays your biggest hit', big.dmg, 'ins'); } }
-        if (live) { let rev = SIZE[sizes[2]].earn * stars / 5; if (c.HITL) rev *= 0.9; rev = Math.round(rev * 10) / 10;
-          add('Revenue ' + SIZE[sizes[2]].e + ' €' + SIZE[sizes[2]].earn + 'k × ' + stars + '/5 ⭐' + (c.HITL ? ' × 90% (human in the loop)' : ''), rev, 'rev'); }
-        // lesson: cheapest control that would have saved the most
-        const worst = R.hits.filter(v => v.dmg || v.would).sort((a, b) => (b.dmg || b.would) - (a.dmg || a.would))[0];
-        if (worst) { const w = N[worst.nid].w, fix = Object.values(C).find(x => x.fix.includes(w) && !x.sec) || Object.values(C).find(x => x.fix.includes(w));
-          if (worst.kind === 'partial') R.lesson = '🎯 Red teaming (€15k) would have made your ' + worst.by.n.toLowerCase() + ' work fully.';
-          else if (worst.dmg && fix) R.lesson = fix.i + ' ' + fix.n + ' (€' + fix.cost + 'k) would have saved you €' + worst.dmg + 'k.';
-          else if (worst.would) R.lesson = '⏸️ Pausing saved you from a €' + worst.would + 'k hit.'; }
-        if (!worst && pausedAt) R.lesson = '⏸️ Nothing would have hit you. Pausing cost you the revenue.';
-        if (!R.lesson) R.lesson = sizes[2] ? '✅ No news hit you this time. Your controls (or your luck) held.' : '⏸️ You paused this one.';
-        if (proj.trap && !sizes[0]) R.lesson = '🚫 Right call. This system is banned under the EU AI Act.';
+      if (st >= 2) {
+        R.hits.filter(v => v.kind === 'hit' && v.resp !== 'disc').forEach(v => { out.quiet++;
+          v.leaked = hash(seed + ':leak:' + pid + ':' + i + ':' + v.nid) < 0.5; if (v.leaked) { stars -= 2; R.leaked = (R.leaked || 0) + 1; } });
+        stars = Math.max(0, stars);
+        if (size && proj.trap) { book('🚫 Fined: banned under the EU AI Act', -TRAPFINE[size]); stars -= 1; R.fined = 1; }
+        else if (size) { const s = Math.max(0, Math.min(5, stars)), rev = Math.round(SIZE[size].earn * s / 5 * 10) / 10; R.rev = rev; book('📈 Revenue €' + SIZE[size].earn + 'k × ' + s + '/5 ⭐', rev); }
+        // one lesson
+        const worst = R.hits.filter(v => v.dmg).sort((a, b) => b.dmg - a.dmg)[0];
+        if (proj.trap) R.lesson = size ? '🚫 This system is banned under the EU AI Act. No fix makes it legal. Pause it.' : '🚫 Right call. This system is banned under the EU AI Act.';
+        else if (worst) { const k = FIX[N[worst.nid].w]; R.lesson = C[k].i + ' ' + C[k].n + ' (€' + C[k].cost + 'k) would have saved you €' + worst.dmg + 'k and a star.'; }
+        else if (!size && R.hits.some(v => v.kind === 'wouldHit')) R.lesson = '⏸️ Pausing kept you out of the news this time.';
+        else if (!size) R.lesson = '⏸️ Nothing would have hit you. Pausing cost you the revenue.';
+        else R.lesson = R.hits.some(v => v.kind === 'blocked') ? '🛡️ Your fix blocked a real incident. That money was well spent.' : '✅ No news hit you this time. Your fixes, or your luck, held.';
       }
       stars = Math.max(0, Math.min(5, stars)); R.starsAfter = stars;
       out.proj.push(R);
     }
-    out.budget = Math.round(budget * 10) / 10; out.stars = stars; out.insUsed = insUsed;
+    const r1 = v => Math.round(v * 10) / 10;
+    out.budget = r1(budget); out.year = r1(year); out.total = r1(budget + year); out.stars = stars;
     return out;
   }
-  const spend = (state, pid, pl) => score(state, pid, pl).budget; // current budget, for "can I afford it?"
 
-  const api = { hash, shuffle, START, BUILD, SIZE, ORDER, SEV, W, C, F, N, AREAS, M3, TIER, DOMAINS, DKEYS, ALLP,
-    pickProjects, dealt, drawNews, drawM3, stageOf, score, spend, ownsF };
+  const api = { hash, shuffle, PER, budgetFor, SIZE, ORDER, SEV, DISCLOSE, TRAPFINE, W, C, FIX, N, AREAS, TIER, DOMAINS, DKEYS, ALLP,
+    pickProjects, dealt, drawNews, stageOf, score };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.DeltaGame = api;
 })(typeof window !== 'undefined' ? window : globalThis);
