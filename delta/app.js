@@ -62,7 +62,8 @@
   }
   function rulesList() { return `<ul class="rules">
     <li><span>🔒</span><div>Each project has <b>2 hidden weaknesses</b>. Only you can see yours.</div></li>
-    <li><span>🛡️</span><div>Buy <b>controls</b> to fix them before you launch.</div></li>
+    <li><span>💰</span><div><b>One budget for the whole game.</b> €${G.START}k must last all ${len()} projects, so about <b>€${Math.round(G.START / len())}k each</b>. Don't spend it all on project 1.</div></li>
+    <li><span>🛡️</span><div>Buy only the <b>controls</b> that fix your weaknesses. You don't need every card.</div></li>
     <li><span>🚀</span><div>Launch <b>small or big</b>, or <b>pause</b> if it looks wrong.</div></li>
     <li><span>📰</span><div>Watch the big screen. <b>Real AI incidents</b> will break.</div></li>
     <li><span>⭐</span><div>Lose trust and you <b>earn less</b> on every project after.</div></li></ul>`; }
@@ -72,7 +73,7 @@
       <h2 style="font-size:29px;margin-top:14px">You're the new <em>Head of AI</em> at ${esc(d.org)}.</h2>
       <div class="obj"><div class="t">🎯 YOUR OBJECTIVE</div>Run ${len()} AI projects. Finish with the <b>biggest budget</b> while keeping customers' <b>trust ⭐</b>.</div>
       <div class="k">How it works</div>${rulesList()}
-      <div class="facts"><div><b>€${G.START}k</b>budget</div><div><b>⭐×5</b>trust</div><div><b>~${len() * 6} min</b>${len()} projects</div></div>
+      <div class="facts"><div><b>€${G.START}k</b>for all ${len()}</div><div><b>⭐×5</b>trust</div><div><b>~${len() * 6} min</b>${len()} projects</div></div>
       <input class="inp" id="nm" maxlength="14" placeholder="Your name…" autocomplete="off">
       <button class="btn" id="join">Join the game →</button></div>`;
   }
@@ -100,7 +101,17 @@
     }
     if (expired) return head + `<div class="lockd"><div class="e">⏰</div><b>Time’s up</b><div class="hint">You didn’t launch, so this project is paused. Only the €${G.BUILD}k build cost is charged.</div></div>`;
     const tab = ui.tab;
-    const list = (tab === 'p' ? Object.keys(G.C) : Object.keys(G.F)).map((k, o) => [k, ((tab === 'p' ? G.C : G.F)[k].fix.some(w => my.includes(w)) ? -100 : 0) + o]).sort((a, b) => a[1] - b[1]).map(x => x[0]);
+    // shortlist: the controls that fix your weaknesses + a few look-alikes (same for this player and project), plus anything already bought
+    const allC = Object.keys(G.C), fixC = allC.filter(k => G.C[k].fix.some(w => my.includes(w)));
+    const decoy = G.shuffle(allC.filter(k => !fixC.includes(k)), state.seed + ':' + pid + ':' + i + ':dc').slice(0, 6 - Math.min(fixC.length, 3));
+    const shortC = G.shuffle(fixC.concat(decoy), state.seed + ':' + i + ':ord').concat(Object.keys(c).filter(k => !fixC.includes(k) && !decoy.includes(k)));
+    const list = tab === 'p' ? (ui.allC ? allC : shortC) : Object.keys(G.F);
+    // budget pacing: how much of the money should go on this project
+    const cards$ = Object.keys(c).reduce((a, k) => a + G.C[k].cost, 0) + Object.keys(G.F).filter(k => m.f && m.f[k] === i).reduce((a, k) => a + G.F[k].cost, 0);
+    const startHere = r.budget + cards$;  // cards are already deducted from r.budget while shopping
+    const spentHere = G.BUILD + cards$ + (ui.size && ui.size !== 'pause' ? G.SIZE[ui.size].cost : 0);
+    const left_ = len() - i, fair = Math.round(startHere / left_);
+    const pace = `<div class="pace ${spentHere > fair && left_ > 1 ? 'over' : ''}">💰 <b>${eur(startHere)}</b> must last <b>${left_ === 1 ? 'this last project' : 'all ' + left_ + ' projects left'}</b>. ${left_ === 1 ? 'Spend what helps.' : `Aim for about <b>€${fair}k</b> on this one.`}<div class="pb"><i style="width:${Math.min(100, Math.round(spentHere / Math.max(fair, 1) * 100))}%"></i></div><small>This project so far: €${spentHere}k (build + cards + launch)${spentHere > fair && left_ > 1 ? ' · over your share, leave room for the next ones' : ''}</small></div>`;
     const cards = list.map(k => {
       const x = tab === 'p' ? G.C[k] : G.F[k], match = x.fix.some(w => my.includes(w));
       if (tab === 'p') { const own = !!c[k];
@@ -108,17 +119,19 @@
       const owned = m.f && m.f[k] != null, mine = owned && m.f[k] === i, locked = x.wild && (!(m.f && m.f.IRP != null) || !(m.f && m.f.INV != null));
       return `<button class="cc ${owned ? (mine ? 'own' : 'done') : ''} ${match && !owned ? 'match' : ''} ${locked && !owned ? 'lock' : ''}" data-fnd="${k}">${owned ? '<span class="bought">✓ OWNED</span>' : ''}<span class="ic">${x.i}</span><div class="c">€${x.cost}k</div><div class="n">${esc(x.n)}</div><div class="d">${esc(x.d)}</div>${match ? '<span class="mt">FIXES YOUR WEAKNESS</span>' : ''}${x.sec ? '<div class="tip">💡 Tip: pair it with Red teaming</div>' : ''}${locked && !owned ? '<div class="ow">🔒 Needs Incident response plan + AI inventory</div>' : ''}${owned && !mine ? '<div class="ow">Covers every project</div>' : ''}</button>`;
     }).join('');
+    if (ui.size && ui.size !== 'pause' && r.budget < G.BUILD + G.SIZE[ui.size].cost) ui.size = null;  // bought cards since choosing: drop a size you can no longer afford
     const sel = ui.size || null, bud = r.budget;
     const opt = k => { const s = G.SIZE[k], need = G.BUILD + s.cost;
-      return `<button class="lc ${sel === k ? 'on' : ''}" data-size="${k}" ${bud < need ? 'disabled' : ''}><span class="e">${s.e}</span><div><div class="nm">${s.n}</div><div class="s">${s.s}</div></div><div class="r">Costs <b>€${s.cost}k</b>Earns €${s.earn}k · damage ×${s.mult === .5 ? '½' : s.mult}</div></button>`; };
-    return head + `<div class="k" style="display:flex;justify-content:space-between"><span>👆 Tap a card to buy it · tap again to undo</span><span class="tmr" data-tmr>${fmtT(left())}</span></div>
+      return `<button class="lc ${sel === k ? 'on' : ''}" data-size="${k}" ${bud < need && sel !== k ? 'disabled' : ''}><span class="e">${s.e}</span><div><div class="nm">${s.n}</div><div class="s">${s.s}</div></div><div class="r">Costs <b>€${s.cost}k</b>Earns €${s.earn}k · damage ×${s.mult === .5 ? '½' : s.mult}</div></button>`; };
+    return head + pace + `<div class="k" style="display:flex;justify-content:space-between"><span>👆 Tap a card to buy it · tap again to undo</span><span class="tmr" data-tmr>${fmtT(left())}</span></div>
       <div class="tabs"><button data-tab="p" class="${tab === 'p' ? 'on' : ''}">🛡️ This project</button><button data-tab="f" class="${tab === 'f' ? 'on' : ''}">🏗️ Foundation</button></div>
       <div class="grid">${cards}</div>
-      <div class="hint">${tab === 'p' ? 'Project controls protect this project only.' : 'Foundation cards are bought once and protect every project from now on.'}</div>
-      <div class="k">Choose how big to launch (+ €${G.BUILD}k build cost)</div>
+      ${tab === 'p' ? `<button class="more" id="allc">${ui.allC ? '▲ Show the shortlist only' : '▼ Show all ' + allC.length + ' controls'}</button>` : ''}
+      <div class="hint">${tab === 'p' ? 'Project controls protect this project only. You only need the ones that fix your weaknesses.' : 'Foundation cards are bought once and protect every project from now on. You don’t need them all.'}</div>
+      <div class="k">Choose how big to launch (+ €${G.BUILD}k build cost) · tap again to unselect</div>
       ${G.ORDER.map(opt).join('')}
       <button class="lc pa ${sel === 'pause' ? 'on' : ''}" data-size="pause"><span class="e">⏸️</span><div><div class="nm">Pause</div><div class="s">Don't launch this one</div></div><div class="r">Lose <b>€${G.BUILD}k</b>build cost only</div></button>
-      <div class="hint">You can expand later, but you can never shrink.</div>
+      <div class="hint">After the news you can expand or pause, and you can undo that until the next headline.</div>
       <button class="btn" id="go" ${sel ? '' : 'disabled'}>${sel ? (sel === 'pause' ? 'Pause this project ⏸️' : 'Launch ' + G.SIZE[sel].n + ' ' + G.SIZE[sel].e) : 'Choose a launch size'}</button>`;
   }
   // ---- news ----
@@ -136,16 +149,20 @@
   function newsScreen(m, r) {
     const i = idx(), R = r.proj[i], stage = ph() === 'w1' ? 1 : 2, pr = myPr();
     const cards = R.hits.slice().sort((a, b) => b.stage - a.stage);
-    const live = !!R.size;
-    const key = stage === 1 ? 's1' : 's2', cur = pr[key];
+    // size going INTO this news week (this week's own choice can still be changed)
+    const b0 = pr.s0 && pr.s0 !== 'pause' ? pr.s0 : null;
+    const before = stage === 1 ? b0 : (b0 && pr.s1 !== 'pause' ? (pr.s1 || b0) : null);
+    const live = !!before;
+    const key = stage === 1 ? 's1' : 's2', cur = pr[key] || null;
     let decide = '';
     if (live) {
-      const s = R.size, nxt = G.ORDER[G.ORDER.indexOf(s) + 1], diff = nxt ? G.SIZE[nxt].cost - G.SIZE[s].cost : 0;
-      decide = `<div class="k">You are live: ${G.SIZE[s].e} ${G.SIZE[s].n}. What now?</div>
-        <div class="row3"><button data-dec="stay" class="${!cur || cur === s ? 'on' : ''}">Stay<small>keep going</small></button>
-        <button data-dec="${nxt || ''}" class="${cur && cur === nxt ? 'on' : ''}" ${nxt && r.budget >= diff ? '' : 'disabled'}>⬆️ Expand<small>${nxt ? G.SIZE[nxt].n + ' · €' + diff + 'k' : 'already max'}</small></button>
+      const s = before, nxt = G.ORDER[G.ORDER.indexOf(s) + 1], diff = nxt ? G.SIZE[nxt].cost - G.SIZE[s].cost : 0;
+      const now = cur === 'pause' ? '⏸️ Paused' : cur ? G.SIZE[cur].e + ' ' + G.SIZE[cur].n : G.SIZE[s].e + ' ' + G.SIZE[s].n;
+      decide = `<div class="k">You were live: ${G.SIZE[s].e} ${G.SIZE[s].n}. What now? · <span style="color:var(--gold)">Now: ${now}</span></div>
+        <div class="row3"><button data-dec="stay" class="${!cur ? 'on' : ''}">Stay<small>keep going</small></button>
+        <button data-dec="${nxt || ''}" class="${cur && cur === nxt ? 'on' : ''}" ${nxt && (cur === nxt || r.budget >= diff) ? '' : 'disabled'}>⬆️ Expand<small>${nxt ? G.SIZE[nxt].n + ' · €' + diff + 'k' : 'already max'}</small></button>
         <button data-dec="pause" class="pz ${cur === 'pause' ? 'on' : ''}">⏸️ Pause<small>half launch cost back</small></button></div>
-        <div class="hint">${stage === 1 ? 'Week 4 news comes next.' : 'Month 3 comes next: the regulator and the press.'}</div>`;
+        <div class="hint">${cur ? 'Changed your mind? Tap it again (or Stay) to undo. ' : ''}${stage === 1 ? 'Week 4 news comes next.' : 'Month 3 comes next: the regulator and the press.'}</div>`;
     } else decide = `<div class="lockd"><div class="e">⏸️</div><b>Your project is paused</b><div class="hint">News can’t hurt you, but you won’t earn from it.</div></div>`;
     const pending = R.hits.find(v => v.kind === 'hit' && v.star && !v.resp && v.stage === stage && !ui.sheetSkip[v.nid]);
     let sheet = '';
@@ -214,11 +231,11 @@
        <div class="st"><div class="n">4</div><div class="h">📰 The news breaks</div><div class="d">Real-world incidents in Week 1 and Week 4. Do they hit you?</div></div>
        <div class="st"><div class="n">5</div><div class="h">🏛️ Month 3</div><div class="d">The regulator and the press check in. Then results</div></div></div>
       <div class="two">
-       <div class="bx"><div class="t">🏆 HOW TO WIN</div><ul><li>Most <b>€ budget</b> after ${len()} projects wins</li><li>Your revenue is multiplied by your <b>⭐ trust</b>, so lost trust means lost sales</li><li>🌱 <b>Responsible Leader</b> award for the most ⭐ left</li></ul></div>
+       <div class="bx"><div class="t">🏆 HOW TO WIN</div><ul><li><b>One €${G.START}k budget for all ${len()} projects</b>: about €${Math.round(G.START / len())}k each. Spend it all on project 1 and you can't launch the rest</li><li>Most <b>€ budget</b> after ${len()} projects wins</li><li>Your revenue is multiplied by your <b>⭐ trust</b>, so lost trust means lost sales</li><li>🌱 <b>Responsible Leader</b> award for the most ⭐ left</li></ul></div>
        <div class="bx"><div class="t">⚠️ GOOD TO KNOW</div><ul><li>Every headline is based on <b>a real AI incident</b></li><li>Some projects are <b>illegal under the EU AI Act</b>. Spot them and pause</li><li>Hit by an incident? <b>Disclose</b> it or <b>stay quiet</b>, but whistleblowers exist</li></ul></div></div>
      </div><div class="side">
       <div class="qr"><div class="u">Scan to join</div>${qrSVG(joinURL())}<div class="u">${esc(joinURL().replace(/^https?:\/\//, ''))}</div><div class="s">Room: ${esc(ROOM)}</div></div>
-      <div class="bfacts">💰 Start: <b>€${G.START}k</b> · <b>⭐⭐⭐⭐⭐</b><br>⏱️ About <b>${len() * 6} minutes</b> · ${len()} projects<br>👤 Play solo on your phone<br>🎓 No AI or poker knowledge needed</div>
+      <div class="bfacts">💰 <b>€${G.START}k</b> for all ${len()} projects · <b>⭐⭐⭐⭐⭐</b><br>⏱️ About <b>${len() * 6} minutes</b> · ${len()} projects<br>👤 Play solo on your phone<br>🎓 No AI or poker knowledge needed</div>
       <div class="joined"><div class="t">${L.length} PLAYER${L.length === 1 ? '' : 'S'} JOINED</div><div class="chips">${L.map(x => `<span>${esc(x.name)}</span>`).join('')}</div></div>
      </div></div>`;
   }
@@ -332,12 +349,14 @@
       if (x.wild && (f.IRP == null || f.INV == null)) return toast('🔒 The insurer wants your Incident response plan and AI inventory first');
       if (sc(pid, m).budget < x.cost) return toast('Not enough budget');
       DB.update(base + '/f', { [k]: i }); window.SFX && SFX.chip && SFX.chip(); });
-    on('[data-size]', 'click', e => { ui.size = e.currentTarget.dataset.size; render(true); });
+    on('[data-size]', 'click', e => { const v = e.currentTarget.dataset.size; ui.size = ui.size === v ? null : v; render(true); });
+    const ac = document.getElementById('allc'); if (ac) ac.onclick = () => { ui.allC = !ui.allC; render(true); };
     const go = document.getElementById('go');
     if (go) go.onclick = () => { if (!ui.size || left() <= 0) return; DB.update(base + '/pr/' + i, { s0: ui.size }); window.SFX && SFX[ui.size === 'pause' ? 'whoosh' : 'fanfare'] && SFX[ui.size === 'pause' ? 'whoosh' : 'fanfare'](); ui.size = null; };
     const rl = document.getElementById('relaunch'); if (rl) rl.onclick = () => { ui.size = myPr().s0; DB.update(base + '/pr/' + i, { s0: null }); };
     on('[data-dec]', 'click', e => { const v = e.currentTarget.dataset.dec; if (!v) return; const key = ph() === 'w1' ? 's1' : 's2';
-      const R = sc(pid, m).proj[i]; DB.update(base + '/pr/' + i, { [key]: v === 'stay' ? R.size : v }); window.SFX && SFX.chip && SFX.chip(); });
+      const cur = myPr()[key] || null, nv = (v === 'stay' || v === cur) ? null : v;  // stay / tap-again = undo this week's change
+      DB.update(base + '/pr/' + i, { [key]: nv }); window.SFX && SFX.chip && SFX.chip(); });
     on('[data-resp]', 'click', e => { const nid = e.currentTarget.dataset.nid, v = e.currentTarget.dataset.resp; ui.sheetSkip[nid] = 1;
       DB.update(base + '/pr/' + i + '/d', { [nid]: v }); window.SFX && SFX[v === 'disc' ? 'shield' : 'flip'] && SFX[v === 'disc' ? 'shield' : 'flip'](); });
     // host
