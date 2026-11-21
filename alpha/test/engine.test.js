@@ -24,6 +24,12 @@ for (let s = 1; s <= 300; s++) { const rand = A.rng(s), reg = 2 + Math.floor(ran
 const G2 = { round: 2, players: { a: { budget: 10, own: { grd: 1 }, bought: {} }, b: { budget: 10, own: {}, bought: {} } }, fx: {} };
 const lines = A.applyBonus(G2, { g: 'grant', p: { k: 'wind', pid: 'a' } }, A.rng(1)); ok(G2.players.a.budget === 19 && G2.players.b.budget === 14 && lines.length === 2, 'bonus apply');
 const G3 = { round: 2, players: { a: { budget: 10, own: { grd: 2, inj: 0 }, bought: {} } }, fx: {} }; A.applyBonus(G3, { g: null, p: { k: 'lose', pid: 'a' } }, A.rng(1)); ok(G3.players.a.own.grd === 1, 'lose a level');
+// undo within a round
+{ const Gu = { round: 2, fx: {}, players: { u: { budget: 40, own: { grd: 0 }, bought: { grd: 1 } } } }, pu = Gu.players.u; // grd frozen from before
+  ok(A.undo(Gu, pu, 'grd') === 'frozen', 'frozen control cannot go down');
+  const b0 = pu.budget; ok(A.buy(Gu, pu, 'grd') === '', 'strengthen'); ok(pu.own.grd === 1, 'now level 1'); ok(A.undo(Gu, pu, 'grd') === '' && pu.own.grd === 0 && pu.budget === b0, 'undo refunds, back to frozen level'); ok(A.undo(Gu, pu, 'grd') === 'frozen', 'cannot go below frozen');
+  ok(A.buy(Gu, pu, 'out') === '' && pu.own.out === 0, 'buy new'); ok(A.undo(Gu, pu, 'out') === '' && pu.own.out == null && !pu.bought.out && pu.budget === b0, 'deselect refunds fully');
+  const ids = A.OF('Govern').filter(i => A.isOpen(i, Gu)).slice(0, 3); const b1 = pu.budget, bd = A.buyBundle(Gu, pu, ids); ok(bd === '', 'bundle'); ids.forEach(i => ok(A.canUndo(pu, i), 'bundle part undoable')); ids.forEach(i => A.undo(Gu, pu, i)); ok(Math.abs(pu.budget - b1) < 0.01, 'bundle fully refunded'); }
 // full games
 for (let s = 0; s < 3000; s++) { const r = game(['smart', 'balanced', 'bundler', 'random', 'hoarder', 'none', 'whale', 'security'], s, 'banking');
   Object.values(r.G.players).forEach(pl => { ok(pl.budget >= 0, 'budget never negative'); ok(Object.values(pl.own).every(l => l >= 0 && l <= 2), 'levels in range'); ok(isFinite(A.score(pl)), 'score finite'); const rep = A.report(r.G, Object.keys(r.G.players)[0]); ok(rep.cov.length === 8, 'report'); }); }
