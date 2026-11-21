@@ -41,30 +41,70 @@
     ccm: ['Continuous compliance monitoring', 'Assurance', 3, 3, 'Controls are tested every day, not once a year'],
     ven: ['Vendor monitoring', 'Third parties', 2, 2, 'Tracks the AI vendors you rely on and their changes'],
     vsa: ['Vendor security assessment', 'Third parties', 2, 2, 'Security review of a vendor before and after contract'],
-    exi: ['Exit & portability terms', 'Third parties', 2, 3, 'You can leave a vendor without losing your service']
+    exi: ['Exit & portability terms', 'Third parties', 2, 3, 'You can leave a vendor without losing your service'],
+    aup: ['Acceptable-use policy', 'Govern', 2, 1, 'Plain rules for staff and customers on what the AI may be used for'],
+    rsk: ['AI risk tiering', 'Govern', 2, 1, 'Every system gets a risk tier that decides how much control it needs'],
+    rac: ['RACI & sign-off', 'Govern', 1, 1, 'Named owners and a sign-off step before anything goes live'],
+    pac: ['Policy-as-code library', 'Govern', 2, 2, 'Reusable machine-readable rules the policy engine can enforce'],
+    icl: ['Intent classifier', 'Govern', 2, 3, 'Labels what a request is really trying to do'],
+    lbl: ['Consent & labelling register', 'Data', 2, 1, 'Records what data may be used for what, and why'],
+    msk: ['Masking & tokenisation', 'Data', 2, 2, 'Hides sensitive values before they reach a model'],
+    idx: ['Index access controls', 'Data', 2, 2, 'The assistant can only retrieve what the user may see'],
+    jbk: ['Jailbreak test pack', 'Model', 2, 2, 'A maintained library of known jailbreaks, run before each release'],
+    bnc: ['Benchmark release gates', 'Model', 2, 2, 'A release is blocked if quality drops below the agreed bar'],
+    xpl: ['Explainability tooling', 'Model', 3, 2, 'Shows why the model decided what it decided'],
+    tpc: ['Topic & scope limits', 'Security', 1, 1, 'The assistant refuses subjects outside its job'],
+    jbc: ['Jailbreak classifier', 'Security', 2, 2, 'A detector that spots jailbreak attempts as they arrive'],
+    dlp: ['Output data-loss prevention', 'Security', 2, 2, 'Stops sensitive data leaving in an answer'],
+    sbx: ['Sandboxed execution', 'Security', 3, 2, 'Agent code and tools run in a box with no reach into the rest'],
+    dst: ['Prompt fuzzing', 'Security', 2, 3, 'Automatically mutates prompts to find weaknesses'],
+    mcp: ['Plug-in & MCP scanner', 'Security', 2, 3, 'Checks every connected tool and plug-in for hidden risk'],
+    anm: ['Usage anomaly alerts', 'Operate', 2, 1, 'Alerts on odd volumes, costs or behaviour'],
+    rbk: ['Rollback & versioning', 'Operate', 2, 2, 'Go back to the last good model or prompt in minutes'],
+    apv: ['Approval thresholds', 'People', 1, 2, 'Anything above a set value or risk needs a person'],
+    rol: ['Role-based training', 'People', 2, 2, 'Different training for builders, approvers and users'],
+    ev: ['Evidence vault', 'Assurance', 2, 2, 'Test results and approvals stored so you can prove them'],
+    ass: ['Impact assessments', 'Assurance', 3, 2, 'A documented assessment of harm before launch'],
+    ctr: ['AI contract clauses', 'Third parties', 2, 1, 'Contracts cover data use, audit rights and incident notice'],
+    sla: ['Model-change notices', 'Third parties', 1, 2, 'The vendor must tell you before changing the model'],
+    bkp: ['Fallback model', 'Third parties', 3, 3, 'A second model you can switch to if the first fails']
   };
   const IDS = Object.keys(C);
   const CT = {}; IDS.forEach(id => CT[id] = { id, n: C[id][0], d: C[id][1], c: C[id][2], r: C[id][3], t: C[id][4] });
-  const OF = d => IDS.filter(id => CT[id].d === d);
+  // the mind map below each branch: areas, optional sub-areas, then controls (uneven on purpose)
+  const TREE = {
+    Govern: [{ n: 'Policy & standards', k: ['pol', 'aup', 'rsk'] }, { n: 'Accountability', k: ['brd', 'inv', 'rac'] }, { n: 'Run-time policy', k: [{ n: 'Policy engine', k: ['pdp', 'pac'] }, { n: 'Semantic policy', k: ['sem', 'icl'] }] }],
+    Data: [{ n: 'Provenance', k: ['lin', 'lbl'] }, { n: 'Protection', k: ['enc', 'pii', 'msk'] }, { n: 'Retrieval safety', k: ['rag', 'idx'] }],
+    Model: [{ n: 'Testing', k: [{ n: 'Safety testing', k: ['adv', 'red', 'jbk'] }, { n: 'Quality gates', k: ['har', 'bnc'] }] }, { n: 'Fairness & explainability', k: ['bia', 'xpl'] }],
+    Security: [{ n: 'Input defences', k: [{ n: 'Guardrails', k: ['grd', 'tpc', 'jbc'] }, 'inj'] }, { n: 'Output defences', k: ['out', 'dlp'] }, { n: 'Agent safety', k: ['kil', 'tps', 'aid', 'sbx'] }, { n: 'Scanning', k: ['vul', 'sca', 'dst', 'mcp'] }],
+    Operate: [{ n: 'Detect', k: ['drf', 'anm'] }, { n: 'Respond', k: ['irp', 'vpt', 'rem', 'rbk'] }],
+    People: [{ n: 'Oversight', k: ['hil', 'apv'] }, { n: 'Capability', k: ['lit', 'rol', 'esc'] }],
+    Assurance: [{ n: 'Evidence', k: ['aud', 'ev'] }, { n: 'Compliance', k: ['reg', 'ccm'] }, { n: 'Independent', k: ['ind', 'ass'] }],
+    'Third parties': [{ n: 'Due diligence', k: ['vsa', 'ctr'] }, { n: 'Ongoing', k: ['ven', 'sla'] }, { n: 'Exit', k: ['exi', 'bkp'] }]
+  };
+  const leaves = node => typeof node === 'string' ? [node] : node.k.reduce((a, x) => a.concat(leaves(x)), []);
+  const OF = d => TREE[d].reduce((a, n) => a.concat(leaves(n)), []);
+  // sanity: the tree and the catalogue must agree
+  IDS.forEach(id => { if (OF(CT[id].d).indexOf(id) < 0) throw new Error('control not in tree: ' + id); });
   // cross-links on the mind map: owning both ends earns "Linked pair"
-  const LINKS = [['pol', 'reg'], ['inv', 'aud'], ['grd', 'out'], ['kil', 'tps'], ['vul', 'vpt'], ['rag', 'lin'], ['hil', 'esc'], ['ven', 'exi'], ['drf', 'rem'], ['sem', 'pdp'], ['adv', 'red'], ['irp', 'rem'], ['aid', 'tps'], ['lit', 'hil'], ['enc', 'pii']];
+  const LINKS = [['pol', 'reg'], ['inv', 'aud'], ['grd', 'out'], ['kil', 'tps'], ['vul', 'vpt'], ['rag', 'lin'], ['hil', 'esc'], ['ven', 'exi'], ['drf', 'rem'], ['sem', 'pdp'], ['adv', 'red'], ['irp', 'rem'], ['aid', 'tps'], ['lit', 'hil'], ['enc', 'pii'], ['jbc', 'grd'], ['dlp', 'out'], ['anm', 'drf'], ['bkp', 'exi'], ['ev', 'aud'], ['pac', 'pdp']];
 
   // attacks: s = controls that absorb it (first three count fully, the rest at 60%), h = branches hit
   const A = {
-    inj: { n: 'Prompt injection', k: 'Branch-wide', h: ['Security'], s: ['inj', 'grd', 'out', 'adv', 'vul', 'vpt'], b: 10, r: 1, d: 'A crafted message makes the assistant ignore its rules and reveal data.', tell: 'A customer posts a screenshot of the assistant leaking its rules.' },
-    leak: { n: 'Customer data leak', k: 'Branch-wide', h: ['Data'], s: ['enc', 'pii', 'lin', 'grd', 'out', 'irp'], b: 11, r: 1, d: 'Personal data appears in answers and in the logs.', tell: 'A journalist asks why an answer quoted a stranger\'s account.' },
-    bias: { n: 'Discrimination complaint', k: 'Targeted', h: ['Model', 'People'], s: ['bia', 'har', 'hil', 'lit', 'aud', 'ind'], b: 10, r: 1, d: 'A group of customers is treated worse by the model, and someone notices.', tell: 'A consumer body files a complaint about approval rates.' },
-    drift: { n: 'Silent model drift', k: 'Targeted', h: ['Model', 'Operate'], s: ['drf', 'har', 'hil', 'rem', 'ccm'], b: 9, r: 1, d: 'Quality slowly slides for weeks before anyone looks.', tell: 'Complaints creep up, but nothing triggers an alert.' },
-    rag: { n: 'RAG poisoning', k: 'Targeted', h: ['Data', 'Security'], s: ['rag', 'lin', 'sem', 'out', 'enc'], b: 9, r: 2, d: 'A planted document steers the assistant to fraudulent advice.', tell: 'Answers about fees quote a policy nobody wrote.' },
-    rogue: { n: 'Rogue agent action', k: 'Targeted', h: ['Security', 'People'], s: ['kil', 'tps', 'hil', 'aid', 'vpt', 'esc'], b: 12, r: 2, d: 'An agent takes actions nobody approved, then keeps going.', tell: 'Three unusual transactions land in the middle of the night.' },
-    unsc: { n: 'Unscanned vulnerability', k: 'Branch-wide', h: ['Security', 'Operate'], s: ['vul', 'sca', 'vpt', 'rem', 'adv', 'red'], b: 10, r: 2, d: 'A known flaw nobody scanned for is used against you.', tell: 'A researcher publishes a proof of concept on your product.' },
-    ven: { n: 'Vendor model outage', k: 'Branch-wide', h: ['Third parties', 'Operate'], s: ['ven', 'vsa', 'exi', 'irp', 'drf', 'rem'], b: 9, r: 2, d: 'Your AI vendor fails or changes the model with no notice.', tell: 'Status page turns red and support goes quiet.' },
-    wallet: { n: 'Denial of wallet', k: 'Branch-wide', h: ['Operate', 'Security'], s: ['drf', 'grd', 'rem', 'vpt', 'kil'], b: 8, r: 2, d: 'Bots drive up usage and run up your model bill.', tell: 'Finance asks why the cloud bill tripled overnight.' },
-    insider: { n: 'Insider misuse', k: 'Targeted', h: ['People', 'Security'], s: ['aid', 'hil', 'lit', 'aud', 'esc', 'tps'], b: 9, r: 2, d: 'An employee uses AI access to take or change things they should not.', tell: 'An unusual export shows up in the access log.' },
-    bypass: { n: 'Paraphrased policy bypass', k: 'Targeted', h: ['Govern', 'Security'], s: ['sem', 'pdp', 'inj', 'har', 'red'], b: 9, r: 3, d: 'The same forbidden request, reworded, walks past your keyword rules.', tell: 'A forum thread shares the rewording trick.' },
-    stuck: { n: 'Fix that never stuck', k: 'Targeted', h: ['Operate', 'Assurance'], s: ['ccm', 'rem', 'vul', 'aud', 'irp'], b: 9, r: 3, d: 'A flaw you "fixed" last quarter is back, and nobody tested it again.', tell: 'The same ticket is raised for the third time.' },
-    sector: { n: 'Sector-wide AI incident', k: 'Whole tree', h: DISC.slice(), s: ['irp', 'brd', 'inv', 'hil', 'aud', 'exi', 'rem'], b: 14, r: 3, d: 'A shared model fails across the industry and every branch is shaken.', tell: 'Three competitors announce outages in the same hour.' },
-    reg: { n: 'Regulator investigation', k: 'Regulatory', h: ['Govern', 'Assurance'], s: ['aud', 'reg', 'inv', 'brd', 'pol', 'ind', 'ccm'], b: 12, r: 2, d: 'The supervisor asks for your AI inventory, your logs and who signed off.', tell: 'A letter arrives with a ten-day deadline.' }
+    inj: { n: 'Prompt injection', k: 'Branch-wide', h: ['Security'], s: ['inj', 'grd', 'out', 'adv', 'vul', 'vpt', 'jbc', 'tpc', 'jbk'], b: 10, r: 1, d: 'A crafted message makes the assistant ignore its rules and reveal data.', tell: 'A customer posts a screenshot of the assistant leaking its rules.' },
+    leak: { n: 'Customer data leak', k: 'Branch-wide', h: ['Data'], s: ['enc', 'pii', 'lin', 'grd', 'out', 'irp', 'msk', 'dlp', 'lbl'], b: 11, r: 1, d: 'Personal data appears in answers and in the logs.', tell: 'A journalist asks why an answer quoted a stranger\'s account.' },
+    bias: { n: 'Discrimination complaint', k: 'Targeted', h: ['Model', 'People'], s: ['bia', 'har', 'hil', 'lit', 'aud', 'ind', 'xpl', 'bnc', 'ass'], b: 10, r: 1, d: 'A group of customers is treated worse by the model, and someone notices.', tell: 'A consumer body files a complaint about approval rates.' },
+    drift: { n: 'Silent model drift', k: 'Targeted', h: ['Model', 'Operate'], s: ['drf', 'har', 'hil', 'rem', 'ccm', 'anm', 'bnc', 'rbk'], b: 9, r: 1, d: 'Quality slowly slides for weeks before anyone looks.', tell: 'Complaints creep up, but nothing triggers an alert.' },
+    rag: { n: 'RAG poisoning', k: 'Targeted', h: ['Data', 'Security'], s: ['rag', 'lin', 'sem', 'out', 'enc', 'idx', 'aup'], b: 9, r: 2, d: 'A planted document steers the assistant to fraudulent advice.', tell: 'Answers about fees quote a policy nobody wrote.' },
+    rogue: { n: 'Rogue agent action', k: 'Targeted', h: ['Security', 'People'], s: ['kil', 'tps', 'hil', 'aid', 'vpt', 'esc', 'sbx', 'apv'], b: 12, r: 2, d: 'An agent takes actions nobody approved, then keeps going.', tell: 'Three unusual transactions land in the middle of the night.' },
+    unsc: { n: 'Unscanned vulnerability', k: 'Branch-wide', h: ['Security', 'Operate'], s: ['vul', 'sca', 'vpt', 'rem', 'adv', 'red', 'dst', 'mcp', 'jbk'], b: 10, r: 2, d: 'A known flaw nobody scanned for is used against you.', tell: 'A researcher publishes a proof of concept on your product.' },
+    ven: { n: 'Vendor model outage', k: 'Branch-wide', h: ['Third parties', 'Operate'], s: ['ven', 'vsa', 'exi', 'irp', 'drf', 'rem', 'ctr', 'sla', 'bkp'], b: 9, r: 2, d: 'Your AI vendor fails or changes the model with no notice.', tell: 'Status page turns red and support goes quiet.' },
+    wallet: { n: 'Denial of wallet', k: 'Branch-wide', h: ['Operate', 'Security'], s: ['drf', 'grd', 'rem', 'vpt', 'kil', 'anm', 'tpc'], b: 8, r: 2, d: 'Bots drive up usage and run up your model bill.', tell: 'Finance asks why the cloud bill tripled overnight.' },
+    insider: { n: 'Insider misuse', k: 'Targeted', h: ['People', 'Security'], s: ['aid', 'hil', 'lit', 'aud', 'esc', 'tps', 'rol', 'apv', 'ev'], b: 9, r: 2, d: 'An employee uses AI access to take or change things they should not.', tell: 'An unusual export shows up in the access log.' },
+    bypass: { n: 'Paraphrased policy bypass', k: 'Targeted', h: ['Govern', 'Security'], s: ['sem', 'pdp', 'inj', 'har', 'red', 'pac', 'icl', 'jbc'], b: 9, r: 3, d: 'The same forbidden request, reworded, walks past your keyword rules.', tell: 'A forum thread shares the rewording trick.' },
+    stuck: { n: 'Fix that never stuck', k: 'Targeted', h: ['Operate', 'Assurance'], s: ['ccm', 'rem', 'vul', 'aud', 'irp', 'rbk', 'ev'], b: 9, r: 3, d: 'A flaw you "fixed" last quarter is back, and nobody tested it again.', tell: 'The same ticket is raised for the third time.' },
+    sector: { n: 'Sector-wide AI incident', k: 'Whole tree', h: DISC.slice(), s: ['irp', 'brd', 'inv', 'hil', 'aud', 'exi', 'rem', 'bkp', 'rsk'], b: 14, r: 3, d: 'A shared model fails across the industry and every branch is shaken.', tell: 'Three competitors announce outages in the same hour.' },
+    reg: { n: 'Regulator investigation', k: 'Regulatory', h: ['Govern', 'Assurance'], s: ['aud', 'reg', 'inv', 'brd', 'pol', 'ind', 'ccm', 'ev', 'ass', 'rac', 'rsk'], b: 12, r: 2, d: 'The supervisor asks for your AI inventory, your logs and who signed off.', tell: 'A letter arrives with a ten-day deadline.' }
   };
   const AIDS = Object.keys(A);
   const REGN = { banking: 'Supervisor review (EU AI Act, DORA)', insurance: 'Supervisory review (EU AI Act, Solvency II)', health: 'Regulator audit (EU AI Act, MDR)', energy: 'Regulator audit (NIS2, EU AI Act)', telecom: 'Regulator audit (NIS2, EU AI Act)' };
@@ -86,7 +126,7 @@
     3: { name: 'Pressure', theme: 'Attackers get smarter', more: 'Semantic policy, red teams, agent identity and independent assurance open.' },
     4: { name: 'Reckoning', theme: 'Everything is tested', more: 'No new branches. Close your gaps, then everything is tested.' }
   };
-  const START = 26, TOPUP = { 2: 10, 3: 10, 4: 8 }, BASE_EQ = 40, EXPO = 1.4, RISE = 0.12, UPG = 0.6, BUNDLE = 0.85;
+  const START = 40, TOPUP = { 2: 16, 3: 16, 4: 12 }, BASE_EQ = 40, EXPO = 1.4, RISE = 0.12, UPG = 0.6, BUNDLE = 0.85;
 
   // surprise cards. g = for everyone, p = one random player
   const BON = {
@@ -116,10 +156,11 @@
     if (fx.price && (CT[id].d === 'Third parties' || CT[id].d === 'Data')) x *= 1.25;
     return half(x);
   }
-  function bundle(G, p, d) { const ids = OF(d).filter(id => isOpen(id, G) && (p.own || {})[id] == null); if (ids.length < 2) return null; return { ids, cost: half(ids.reduce((s, id) => s + price(G, p, id), 0) * BUNDLE) }; }
+  function bundleIds(G, p, ids) { ids = ids.filter(id => isOpen(id, G) && (p.own || {})[id] == null); if (ids.length < 2) return null; return { ids, cost: half(ids.reduce((s, id) => s + price(G, p, id), 0) * BUNDLE) }; }
+  const bundle = (G, p, x) => bundleIds(G, p, typeof x === 'string' ? OF(x) : x);
   function canBuy(G, p, id) { if (!CT[id] || !isOpen(id, G)) return 'closed'; const c = price(G, p, id); if (c == null) return 'max'; if (p.budget < c) return 'cash'; return ''; }
   function buy(G, p, id) { const e = canBuy(G, p, id); if (e) return e; const c = price(G, p, id); p.budget = rnd(p.budget - c); p.own = p.own || {}; p.bought = p.bought || {}; const l = p.own[id]; p.own[id] = l == null ? 0 : l + 1; if (l == null) p.bought[id] = G.round; p.spent = rnd((p.spent || 0) + c); return ''; }
-  function buyBundle(G, p, d) { const b = bundle(G, p, d); if (!b) return 'none'; if (p.budget < b.cost) return 'cash'; p.budget = rnd(p.budget - b.cost); p.spent = rnd((p.spent || 0) + b.cost); p.own = p.own || {}; p.bought = p.bought || {}; b.ids.forEach(id => { p.own[id] = 0; p.bought[id] = G.round; }); return ''; }
+  function buyBundle(G, p, x) { const b = bundle(G, p, x); if (!b) return 'none'; if (p.budget < b.cost) return 'cash'; p.budget = rnd(p.budget - b.cost); p.spent = rnd((p.spent || 0) + b.cost); p.own = p.own || {}; p.bought = p.bought || {}; b.ids.forEach(id => { p.own[id] = 0; p.bought[id] = G.round; }); return ''; }
   const value = p => rnd(Object.keys(p.own || {}).reduce((s, id) => { let v = CT[id].c; for (let i = 0; i < p.own[id]; i++) v += up(id); return s + v; }, 0));
 
   /* ---------- attacks ---------- */
@@ -186,6 +227,6 @@
     const topGapD = gaps.length ? CT[gaps[0].id].d : weak.d;
     return { gaps, cov, weak: weak.d, strong: strong.d, dmg: rnd(p.dmg || 0), saved: rnd(p.saved || 0), credit: rnd(p.credit || 0), score: score(p), value: value(p), left: p.budget, advice: advice[topGapD], advD: topGapD, byRound: p.byRound || [] }; }
 
-  root.ALPHA = { DISC, DSHORT, DCOL, LV, ABS, CAP, C: CT, IDS, OF, LINKS, A, AIDS, REGN, USE, SECTORS, DEFAULT_UC, ROUNDS, START, TOPUP, BASE_EQ, BON, BIDS, rnd, half, rng, isOpen, price, up, bundle, canBuy, buy, buyBundle, value, absorb, exposed, baseDmg, draw, strike, drawBonus, applyBonus, awardsRound, finalAwards, score, report, advice };
+  root.ALPHA = { DISC, TREE, leaves, bundleIds, DSHORT, DCOL, LV, ABS, CAP, C: CT, IDS, OF, LINKS, A, AIDS, REGN, USE, SECTORS, DEFAULT_UC, ROUNDS, START, TOPUP, BASE_EQ, BON, BIDS, rnd, half, rng, isOpen, price, up, bundle, canBuy, buy, buyBundle, value, absorb, exposed, baseDmg, draw, strike, drawBonus, applyBonus, awardsRound, finalAwards, score, report, advice };
   if (typeof module !== 'undefined') module.exports = root.ALPHA;
 })(typeof window !== 'undefined' ? window : globalThis);

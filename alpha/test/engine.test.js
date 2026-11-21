@@ -1,13 +1,13 @@
 const A = require('../game.js'), { game } = require('./sim.js'); let n = 0;
 const ok = (c, m) => { n++; if (!c) { console.error('FAIL', m); process.exit(1); } };
-ok(A.IDS.length === 35 && A.DISC.every(d => A.OF(d).length >= 3), 'catalogue');
+ok(A.IDS.length === 61 && A.DISC.every(d => A.OF(d).length >= 5), 'catalogue');
 ok(new Set(A.DISC.map(d => A.OF(d).length)).size >= 4, 'uneven branching');
-const G = { round: 1, players: { a: { budget: 26, own: {} } }, fx: {} }, p = G.players.a;
+const G = { round: 1, players: { a: { budget: 40, own: {} } }, fx: {} }, p = G.players.a;
 ok(A.price(G, p, 'grd') === 2 && A.canBuy(G, p, 'pdp') === 'closed', 'price and round gating');
-A.buy(G, p, 'grd'); ok(p.own.grd === 0 && p.budget === 24, 'buy');
+A.buy(G, p, 'grd'); ok(p.own.grd === 0 && p.budget === 38, 'buy');
 ok(A.price(G, p, 'grd') === 1.5, 'upgrade 60% of base, rounded up to half');
 A.buy(G, p, 'grd'); A.buy(G, p, 'grd'); ok(p.own.grd === 2 && A.price(G, p, 'grd') === null && A.canBuy(G, p, 'grd') === 'max', 'max level, no sell');
-const b = A.bundle(G, p, 'Govern'); ok(b && b.ids.length === 3 && b.cost < b.ids.reduce((s, i) => s + A.C[i].c, 0), 'bundle cheaper than parts');
+const b = A.bundle(G, p, 'Govern'); ok(b && b.ids.length === 6 && b.cost < b.ids.reduce((s, i) => s + A.C[i].c, 0), 'bundle cheaper than parts');
 const before = p.budget; ok(A.buyBundle(G, p, 'Govern') === '' && p.budget === A.rnd(before - b.cost), 'buy bundle');
 G.fx = { disc: true }; ok(A.price(G, p, 'lin') === 1.5 || A.price(G, p, 'lin') === 2 * .8 + 0 || true, 'discount ok');
 // absorption
