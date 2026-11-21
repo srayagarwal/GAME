@@ -197,7 +197,7 @@
   const has = (map, k, q) => map && map[k] != null && map[k] <= q;
 
   function score(state, pid, pl) {
-    pl = pl || {}; const seed = state.seed, Q = state.len || 6, prods = state.products || [], fnd = pl.f || {}, my = pl.p || {}, resp = pl.r || {};
+    pl = pl || {}; const seed = state.seed, Q = 4, prods = state.products || [], fnd = pl.f || {}, my = pl.p || {}, resp = pl.r || {};
     let cash = 0, trust = 5, insUsed = false;
     const out = { quarters: [], prod: {}, hits: 0, disclosed: 0, quiet: 0, pulled: 0, leaks: 0, banned: 0, m: {} };
     const P = {}; prods.forEach(id => { const x = my[id] || {}; P[id] = { id, risks: risksOf(seed, id), s: x.s, a: x.a, l: x.l, x: x.x, c: x.c || {}, closedBy: {}, fined: false }; });
@@ -317,7 +317,7 @@
     if (q >= 1) {
       const liveHigh = plist.some(([, pl]) => prods.some(pr => ALLP[pr].tier === 'high' && ((pl.p || {})[pr] || {}).l != null));
       const w = { INSPECT: liveHigh ? 5 : 0.3, DPA: 2.2, JOURNAL: 1.8, BOARD: 1.6, EXPLAIN: 1.6, WHISTLE: 1.4, INSURER: 1.2, QUIET: 0.8 };
-      if (q === (state.len || 6) - 1 && !usedReg.includes('INSPECT') && liveHigh) w.INSPECT = 50;
+      if (q === 3 && !usedReg.includes('INSPECT') && liveHigh) w.INSPECT = 50;
       const opts = Object.keys(w).filter(k => !usedReg.includes(k) || k === 'QUIET').map(k => [k, w[k] * (0.6 + hash(seed + ':e:' + q + k))]).sort((a, b) => b[1] - a[1]);
       reg = opts.length ? opts[0][0] : 'QUIET';
     }

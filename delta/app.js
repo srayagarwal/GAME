@@ -12,7 +12,7 @@
   const eur = v => (v < 0 ? '−€' : '€') + Math.abs(r1(v)) + 'k';
   const sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '') + '€' + Math.abs(r1(v)) + 'k';
   const stars = n => '⭐'.repeat(Math.max(0, n)) + '<span class="dim">' + '⭐'.repeat(5 - Math.max(0, n)) + '</span>';
-  const ph = () => state.phase || 'lobby', q = () => state.q || 0, len = () => state.len || 6;
+  const ph = () => state.phase || 'lobby', q = () => state.q || 0, len = () => 4;
   const me = () => (pid && players[pid]) ? players[pid] : null;
   const left = () => Math.max(0, (state.deadline || 0) - DB.now());
   const fmtT = ms => { const s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
@@ -308,7 +308,6 @@
     let h = `<div class="ph host">${topBar(`<span class="pill">HOST · ${esc(ROOM)}</span>`)}<div class="sec">STATUS</div><div class="box"><div class="ml"><span>Phase</span><b>${{ lobby: 'Lobby', plan: ql(cur) + ' planning', ev: ql(cur) + ' news', rep: ql(cur) + ' report', end: 'Finished' }[p]}</b></div><div class="ml"><span>Players</span><b>${plist().length}</b></div>${p === 'plan' ? `<div class="ml"><span>Time left</span><b data-tmr>${fmtT(left())}</b></div>` : ''}</div>`;
     if (p === 'lobby') {
       h += `<div class="sec">SECTOR</div><div class="chips big">${G.SKEYS.map(k => `<button class="${sk === k ? 'on' : ''}" data-a="hset" data-f="sector" data-k="${k}">${G.SECTORS[k].i} ${esc(G.SECTORS[k].n)}</button>`).join('')}</div>
-        <div class="sec">QUARTERS</div><div class="chips big">${[4, 6].map(n => `<button class="${len() === n ? 'on' : ''}" data-a="hset" data-f="len" data-k="${n}">${n} quarters</button>`).join('')}</div>
         <div class="sec">PLANNING TIME PER QUARTER</div><div class="chips big">${[2, 3, 4, 5].map(n => `<button class="${(state.planMin || CFG.planMinutes || 3) === n ? 'on' : ''}" data-a="hset" data-f="planMin" data-k="${n}">${n} min</button>`).join('')}</div>`;
     }
     const nx = { lobby: '▶ Start the game', plan: '📰 Reveal the news', ev: '📊 Show the quarter report', rep: cur + 1 < len() ? '▶ Plan ' + ql(cur + 1) : '🏆 Final results', end: '' }[p];
