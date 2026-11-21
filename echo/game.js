@@ -3,13 +3,40 @@
   const SEV = { L: { p: .10, d: 4, t: 0, n: 'Low' }, M: { p: .25, d: 9, t: .5, n: 'Medium' }, H: { p: .40, d: 18, t: 1, n: 'High' }, C: { p: .60, d: 30, t: 2, n: 'Critical' } };
   const UP = { L: 'M', M: 'H', H: 'C', C: 'C' };
   const COST = { ctl: 5, ft: 3, scan: 3, fix: 6, mit: 4, ins: 3, defuse: 3 };
-  const CTLS = { mon: { n: 'Monitoring & alerts', i: '📡', d: 'Watches the system live and flags drift, misuse or attacks early.' },
-    hum: { n: 'Human oversight', i: '🧑‍⚖️', d: 'A named person reviews and can stop what the system does.' },
-    tst: { n: 'Testing & red-teaming', i: '🎯', d: 'Attacks and stress-tests the system before real attackers do.' },
-    doc: { n: 'Documentation & audit trail', i: '📑', d: 'Logs, records and ownership that a regulator can inspect.' } };
-  const MATCH = { chat: 'tst', compl: 'tst', cred: 'doc', fraud: 'mon', aml: 'mon', doc: 'hum', coll: 'hum', pay: 'hum', robo: 'hum', suit: 'doc', wealth: 'tst', lake: 'mon', fm: 'tst', offer: 'hum' };
+  const SLOTS = { prv: { n: 'Prevent', d: 'Stop bad inputs and limit what the system can do' }, tst: { n: 'Test', d: 'Find the weakness before an attacker does' }, mon: { n: 'Detect', d: 'Spot problems quickly once the system is live' }, own: { n: 'Oversee & prove', d: 'People in charge, and evidence a regulator can inspect' } };
+  const CT = {
+    grd: { s: 'prv', n: 'Guardrails & input filtering', d: 'Blocks malicious or out-of-scope prompts before the model sees them.', ref: 'EU AI Act Art. 15' },
+    lpv: { s: 'prv', n: 'Least-privilege access', d: 'Gives the system only the data and permissions it really needs.', ref: 'GDPR Art. 25' },
+    ksw: { s: 'prv', n: 'Kill switch & rate limits', d: 'Lets you stop a runaway or misbehaving system at once.', ref: 'EU AI Act Art. 14' },
+    min: { s: 'prv', n: 'Data minimisation', d: 'Collects and keeps only the personal data that is necessary.', ref: 'GDPR Art. 5' },
+    rdt: { s: 'tst', n: 'Red-teaming', d: 'Experts attack the system before launch, like a real adversary.', ref: 'EU AI Act Art. 15' },
+    bia: { s: 'tst', n: 'Bias & fairness testing', d: 'Tests outcomes across groups before and after launch.', ref: 'EU AI Act Art. 10' },
+    evl: { s: 'tst', n: 'Accuracy & hallucination evals', d: 'Measures how often it is wrong, and how.', ref: 'EU AI Act Art. 15' },
+    pen: { s: 'tst', n: 'Penetration test & vulnerability scan', d: 'Looks for known flaws in code, models, libraries and servers.', ref: 'EU AI Act Art. 15 · DORA' },
+    dqc: { s: 'tst', n: 'Data quality & poisoning checks', d: 'Checks training data is clean, licensed and untampered.', ref: 'EU AI Act Art. 10' },
+    drf: { s: 'mon', n: 'Drift monitoring', d: 'Alerts you when performance quietly gets worse.', ref: 'EU AI Act Art. 72' },
+    anm: { s: 'mon', n: 'Anomaly & misuse alerts', d: 'Flags unusual use, attacks and abuse as they happen.', ref: 'EU AI Act Art. 15' },
+    log: { s: 'mon', n: 'Output logging & sampling', d: 'Records what it did and reviews a sample every week.', ref: 'EU AI Act Art. 12' },
+    esc: { s: 'mon', n: 'Incident detection & escalation', d: 'Staff know how to spot an incident and who to tell.', ref: 'EU AI Act Art. 73' },
+    hum: { s: 'own', n: 'Human-in-the-loop review', d: 'A named person approves high-impact decisions and can override.', ref: 'EU AI Act Art. 14' },
+    xai: { s: 'own', n: 'Explainability', d: 'Every decision comes with a reason people can understand.', ref: 'EU AI Act Art. 13' },
+    doc: { s: 'own', n: 'Documentation & audit trail', d: 'Technical records and logs a regulator can inspect.', ref: 'EU AI Act Arts. 11-12' },
+    ria: { s: 'own', n: 'Impact assessment (DPIA / FRIA)', d: 'Assesses the harm to people before the system goes live.', ref: 'GDPR Art. 35 · AI Act Art. 27' },
+    trn: { s: 'own', n: 'Transparency notice', d: 'Tells people they are dealing with an AI system.', ref: 'EU AI Act Art. 50' } };
+  const FITS = { chat: ['grd', 'rdt'], compl: ['bia', 'hum'], cred: ['dqc', 'doc'], fraud: ['rdt', 'anm'], aml: ['drf', 'evl'], doc: ['lpv', 'log'], coll: ['ksw', 'hum'], pay: ['hum', 'ksw'], robo: ['hum', 'evl'], suit: ['xai', 'bia'], wealth: ['evl', 'grd'], lake: ['lpv', 'pen'], fm: ['pen', 'anm'], offer: ['trn', 'ria'] };
+  const FND = {
+    gov: { n: 'AI governance framework', c: 8, d: 'Board-level policy, roles and reporting. In the round 4 audit, fines are halved and you gain +1 Trust.', ref: 'EU AI Act Art. 17 · ISO 42001' },
+    inv: { n: 'AI inventory & named owner', c: 2, d: 'You know every AI system you run and who owns it. Systems earn 3% more because accountability is clear, and negligence penalties in the audit are waived.', ref: 'EU AI Act Arts. 16, 26' },
+    pol: { n: 'AI policy & acceptable use', c: 3, d: 'Clear rules for staff and suppliers. Trust lost to incidents is cut by 50%.', ref: 'EU AI Act Art. 26' },
+    irp: { n: 'Incident response plan', c: 5, d: 'Roles and playbooks ready. Disclosing the flaw is free, and echoes from neighbours hurt 25% less.', ref: 'EU AI Act Art. 73' },
+    eth: { n: 'Ethics & risk committee', c: 6, d: 'Independent review of every system. All systems you own are scanned automatically.', ref: 'EU AI Act Art. 9' },
+    lit: { n: 'AI literacy programme', c: 6, d: 'Staff can judge what they read. Acting on a news card costs €1M, and a fake costs no Trust.', ref: 'EU AI Act Art. 4' },
+    ven: { n: 'Vendor due diligence', c: 5, d: 'Checks suppliers and shared models. Damage echoing from shared pipelines and models is cut by 50%.', ref: 'EU AI Act Art. 25 · DORA Art. 28' },
+    mpl: { n: 'Continuous monitoring platform', c: 5, d: 'One view of every system. Attack odds on all your systems are 20% lower.', ref: 'EU AI Act Art. 72' } };
   const FIT_ODDS = .9, FIT_DMG = .95;
-  const hasFit = (id, ns) => !!(ns && ns.k && MATCH[id] && ns.k.indexOf(MATCH[id]) >= 0);
+  const hasFit = (id, ns) => !!(ns && ns.k && FITS[id] && ns.k.some(k => FITS[id].indexOf(k) >= 0));
+  const slotsUsed = ns => (ns && ns.k || []).map(k => CT[k] && CT[k].s);
+  const fnd = (g, pid, f) => !!(g.players[pid] && g.players[pid].fnd && g.players[pid].fnd[f]);
   const START = 50, TOPUP = [0, 0, 25, 25, 15], MULT = [0, 0, 1.0, 1.4, 1.0];
   const RATE = { min: .49, lim: .588, high: .70, shared: .42 };
   const TIERN = { min: 'MINIMAL', lim: 'LIMITED RISK', high: 'HIGH-RISK', shared: 'SHARED' };
@@ -54,7 +81,7 @@
     const ns = g.nodes[id], N = NODES[id]; if (!ns || !ns.by || ns.pause === r) return 0;
     const ce = effC(ns, r); let b = RATE[N.tier] * N.price * (1 + .25 * Math.min(ce, 3) + ((ns.c || 0) >= 4 ? .125 : 0));
     if (N.agentic && r >= 3) b *= 1.5; if (N.tier === 'high' && ce < 2) b *= .5;
-    b *= trust >= 7 ? 1.1 : trust <= 3 ? .75 : 1;
+    b *= trust >= 7 ? 1.1 : trust <= 3 ? .75 : 1; if (fnd(g, ns.by, 'inv')) b *= 1.03;
     if (N.cat !== 'hub') { const mine = IDS.filter(x => NODES[x].cat === N.cat && !NODES[x].banned); if (mine.length === 3 && mine.every(x => g.nodes[x] && g.nodes[x].by === ns.by)) b *= 1.2; }
     if ((ns.c || 0) >= 4 && r === 4) b *= 1.15; return b; };
   const holders = ns => ns.co ? [[ns.by, .5], [ns.co, .5]] : [[ns.by, 1]];
@@ -70,30 +97,30 @@
   function resolveBids(g) {
     const list = []; Object.keys(g.bids || {}).forEach(pid => Object.keys(g.bids[pid] || {}).forEach(id => { const a = +g.bids[pid][id]; if (a > 0 && NODES[id] && !NODES[id].banned && !(g.nodes[id] && g.nodes[id].by)) list.push({ pid, id, a, cash: g.players[pid].cash }); }));
     list.sort((x, y) => y.a - x.a || x.cash - y.cash); const won = [];
-    list.forEach(b => { if (g.nodes[b.id] && g.nodes[b.id].by) return; const p = g.players[b.pid]; if (p.cash >= b.a) { p.cash = rnd(p.cash - b.a); g.nodes[b.id] = { by: b.pid, c: 0, bought: g.round }; won.push(b); } });
+    list.forEach(b => { if (g.nodes[b.id] && g.nodes[b.id].by) return; const p = g.players[b.pid]; if (p.cash >= b.a) { p.cash = rnd(p.cash - b.a); g.nodes[b.id] = { by: b.pid, c: 0, bought: g.round }; if (fnd(g, b.pid, 'eth')) g.nodes[b.id].scanned = true; won.push(b); } });
     return won; }
   /* attack phase: the ONLY randomness in the game */
   function attack(g, r, rng) {
     const ev = [], loss = {}, tl = {}, hitP = {}, echoT = {}, add = (o, k, v) => o[k] = (o[k] || 0) + v;
     if (MULT[r]) {
-      IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by || ns.fixed) return; const al = (g.players[ns.by] && g.players[ns.by].alert === r) ? ALERT : 1;
+      IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by || ns.fixed) return; const al = ((g.players[ns.by] && g.players[ns.by].alert === r) ? ALERT : 1) * (fnd(g, ns.by, 'mpl') ? .8 : 1);
         const p = Math.min(.95, oddsOf(id, r, ns) * al), roll = rng(); ev.push({ t: 'atk', k: id, by: ns.by, co: ns.co || null, p, roll, hit: roll < p, sev: sevOf(id, r), echo: [] }); });
       ev.filter(e => e.hit).forEach(e => { const ns = g.nodes[e.k], ce = effC(ns, r), d = SEV[e.sev].d * ctlF(ce, .85, .95) * (hasFit(e.k, ns) ? FIT_DMG : 1) * (ns.mit ? .5 : 1);
         e.dmg = rnd(d); const lt = SEV[e.sev].t * (ns.mit ? .5 : 1);
         holders(ns).forEach(([pid, sh]) => { add(loss, pid, (ns.ins ? d * .3 : d) * sh); add(tl, pid, lt * sh); hitP[pid] = 1; });
         if ((ns.lic || 0) >= r && ns.licBy && g.players[ns.licBy]) add(tl, ns.licBy, 1); // lender shares the blame
         NB[e.k].forEach(nb => { const nn = g.nodes[nb]; if (!nn || !nn.by) return; const dd = SEV[e.sev].d * .5 * ctlF(effC(nn, r), .85, 1); e.echo.push(nb);
-          holders(nn).forEach(([pid, sh]) => { add(loss, pid, (nn.ins ? dd * .3 : dd) * sh); if (pid !== ns.by && pid !== ns.co) echoT[pid] = 1; }); }); });
+          holders(nn).forEach(([pid, sh]) => { const mod = (fnd(g, pid, 'irp') ? .75 : 1) * (NODES[e.k].cat === 'hub' && fnd(g, pid, 'ven') ? .5 : 1); add(loss, pid, (nn.ins ? dd * .3 : dd) * sh * mod); if (pid !== ns.by && pid !== ns.co) echoT[pid] = 1; }); }); });
       IDS.forEach(id => { const ns = g.nodes[id]; if (ns && ns.by && ns.token === r && !ns.defused) { const dm = 6 * ctlF(effC(ns, r), .85, 1);
         holders(ns).forEach(([pid, sh]) => { add(loss, pid, dm * sh); add(tl, pid, sh); hitP[pid] = 1; });
         ev.push({ t: 'token', k: id, by: ns.by, hit: true, dmg: rnd(dm), sev: 'M', p: 1, roll: 0, echo: [] }); } });
     }
     if (r === 4) Object.keys(g.players).forEach(pid => { const d = (g.dil || {})[pid];
-      if (d === 'disclose') { add(loss, pid, 3); add(tl, pid, -1); ev.push({ t: 'dil', by: pid, k: 'dilemma', hit: false, label: 'Disclosed the flaw', p: 0, roll: 0, echo: [] }); }
+      if (d === 'disclose') { add(loss, pid, fnd(g, pid, 'irp') ? 0 : 3); add(tl, pid, -1); ev.push({ t: 'dil', by: pid, k: 'dilemma', hit: false, label: 'Disclosed the flaw', p: 0, roll: 0, echo: [] }); }
       else { const roll = rng(), leak = roll < .5; if (leak) add(tl, pid, 3); ev.push({ t: 'dil', by: pid, k: 'dilemma', hit: leak, label: leak ? 'Stayed quiet · it leaked' : 'Stayed quiet · got away with it', p: .5, roll, echo: [] }); } });
     // shared-liability pacts split cash losses
     (g.pacts || []).filter(p => p.on && p.from <= r && p.until >= r && g.players[p.a] && g.players[p.b]).forEach(p => { const t = (loss[p.a] || 0) + (loss[p.b] || 0); loss[p.a] = t / 2; loss[p.b] = t / 2; });
-    Object.keys(g.players).forEach(pid => { const p = g.players[pid]; let t = p.trust - (tl[pid] || 0) - (echoT[pid] ? 1 : 0); if (!hitP[pid] && r >= 2) t += 1;
+    Object.keys(g.players).forEach(pid => { const p = g.players[pid]; const tv = tl[pid] || 0; let t = p.trust - (tv > 0 ? tv * (fnd(g, pid, 'pol') ? .5 : 1) : tv) - (echoT[pid] ? 1 : 0); if (!hitP[pid] && r >= 2) t += 1;
       t -= payOut(p, loss[pid] || 0); p.trust = clamp(t); });
     return { ev, loss, tl, echoT }; }
   /* cash never goes below zero: an unpaid shortfall becomes a regulator enforcement, -1 Trust per started EUR 5M */
@@ -107,13 +134,14 @@
     Object.keys(g.players).forEach(pid => { const p = g.players[pid]; p.cash = rnd(p.cash + inc[pid]); out[pid].rev = rnd(inc[pid]); });
     if (r === 4) Object.keys(g.players).forEach(pid => { const p = g.players[pid]; let t = p.trust;
       IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || ns.by !== pid) return; const N = NODES[id];
-        if (N.tier === 'high' && effC(ns, r) < 2) { t -= payOut(p, 6) + 2; out[pid].lines.push('Fined €6M · high-risk system without 2 controls'); }
-        if (!ns.fixed && !ns.mit && (!ns.scanned || ns.acc)) { t -= 1; out[pid].lines.push(ns.scanned ? 'Accepted risk logged against you' : 'Never scanned: negligence'); }
+        if (N.tier === 'high' && effC(ns, r) < 2) { const gv = fnd(g, pid, 'gov'); t -= payOut(p, gv ? 3 : 6) + (gv ? 1 : 2); out[pid].lines.push('Fined €6M · high-risk system without 2 controls'); }
+        if (!fnd(g, pid, 'inv') && !ns.fixed && !ns.mit && (!ns.scanned || ns.acc)) { t -= 1; out[pid].lines.push(ns.scanned ? 'Accepted risk logged against you' : 'Never scanned: negligence'); }
         if ((ns.c || 0) >= 4) { t += 1; out[pid].lines.push('Certified system +1 Trust'); } });
+      if (fnd(g, pid, 'gov')) { t += 1; out[pid].lines.push('Governance framework +1 Trust'); }
       p.trust = clamp(t); });
     return out; }
   const owned = (g, pid) => IDS.filter(id => g.nodes[id] && g.nodes[id].by === pid);
   function worth(g, pid) { let v = g.players[pid].cash; IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by) return; const h = holders(ns).find(x => x[0] === pid); if (!h) return; const c = ns.c || 0; v += h[1] * (.8 * NODES[id].price + 2 * c + (c >= 4 ? 3 : 0)); }); return v; }
   const finalScore = (g, pid) => worth(g, pid) * (0.6 + 0.08 * g.players[pid].trust);
-  window.ECHO = { CTLS, MATCH, hasFit, FIT_ODDS, FIT_DMG, effC, holders, payOut, CARDS, CARD_COST, ALERT, LIC_SHARE, CO_SHARE, SEV, COST, START, TOPUP, MULT, RATE, TIERN, NODES, LINKS, NB, IDS, VULN, PACKS, ROUNDS, STEPS, STEPN, ctlF, sevOf, oddsOf, nameOf, revOf, resolveBids, attack, settle, owned, worth, finalScore, clamp, rnd, CATS };
+  window.ECHO = { SLOTS, CT, FITS, FND, slotsUsed, fnd, hasFit, FIT_ODDS, FIT_DMG, effC, holders, payOut, CARDS, CARD_COST, ALERT, LIC_SHARE, CO_SHARE, SEV, COST, START, TOPUP, MULT, RATE, TIERN, NODES, LINKS, NB, IDS, VULN, PACKS, ROUNDS, STEPS, STEPN, ctlF, sevOf, oddsOf, nameOf, revOf, resolveBids, attack, settle, owned, worth, finalScore, clamp, rnd, CATS };
 })();

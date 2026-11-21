@@ -20,14 +20,22 @@ const pick = a => a[Math.floor(R() * a.length)];
   const r = E.attack(t, 3, rng); const e = r.ev.find(x => x.k === 'chat'); assert.ok(e.hit); assert.ok(Math.abs(e.p - E.oddsOf('chat', 3, t.nodes.chat) * .8) < 1e-9); assert.ok(t.players.b.trust < 5 + 1 && r.tl.b === 1);
   // determinism of rng-free parts: no hits with rng=0.999
   const u = { round: 2, players: { a: { cash: 50, trust: 5 } }, nodes: { chat: { by: 'a', c: 0 } }, bids: {}, pacts: [] }; E.attack(u, 2, () => .9999); assert.strictEqual(u.players.a.cash, 50);
-  const f1 = { c: 1, k: ['tst'], scanned: true }, f2 = { c: 1, k: ['mon'], scanned: true };
+  const f1 = { c: 1, k: ['rdt'], scanned: true }, f2 = { c: 1, k: ['lpv'], scanned: true };
   assert.ok(E.hasFit('chat', f1) && !E.hasFit('chat', f2)); assert.ok(Math.abs(E.oddsOf('chat', 2, f1) / E.oddsOf('chat', 2, f2) - E.FIT_ODDS) < 1e-9);
+  assert.strictEqual(Object.keys(E.CT).length, 18); assert.strictEqual(Object.keys(E.FND).length, 8);
+  E.IDS.forEach(id => (E.FITS[id] || []).forEach(k => assert.ok(E.CT[k], 'fit ' + id + ' ' + k)));
+  Object.keys(E.SLOTS).forEach(sl => assert.ok(Object.values(E.CT).filter(c => c.s === sl).length >= 4));
+  // foundations
+  const q = { round: 4, players: { a: { cash: 50, trust: 5, fnd: { gov: 1, inv: 1 } } }, nodes: { robo: { by: 'a', c: 0, scanned: false } }, bids: {}, pacts: [] };
+  const sq = E.settle(q, 4); assert.ok(q.players.a.cash > 50 - 6 && q.players.a.trust >= 5 - 1 + 1 - 1, 'gov/inv'); assert.ok(sq.a.lines.some(l => /Governance/.test(l)));
+  const d = { round: 4, players: { a: { cash: 50, trust: 5, fnd: { irp: 1 } } }, nodes: {}, bids: {}, pacts: [], dil: { a: 'disclose' } }; E.attack(d, 4, () => .5); assert.strictEqual(d.players.a.cash, 50);
+  const eb = { round: 1, players: { a: { cash: 50, trust: 5, fnd: { eth: 1 } } }, nodes: {}, bids: { a: { chat: 8 } } }; E.resolveBids(eb); assert.ok(eb.nodes.chat.scanned);
   console.log('unit tests ok');
 })();
 // --- randomised full games, invariants
 function game(n) {
   const ids = Array.from({ length: n }, (_, i) => 'p' + i); const g = { round: 1, players: {}, nodes: {}, bids: {}, pacts: [], dil: {} };
-  ids.forEach(p => g.players[p] = { cash: E.START, trust: 5 });
+  ids.forEach(p => g.players[p] = { cash: E.START, trust: 5, fnd: {} });
   for (let r = 1; r <= 4; r++) { g.round = r; if (r > 1) ids.forEach(p => g.players[p].cash = E.rnd(g.players[p].cash + E.TOPUP[r]));
     if (r <= 3) { g.bids = {}; ids.forEach(p => { g.bids[p] = {}; E.IDS.forEach(id => { if (R() < .4) g.bids[p][id] = Math.round(R() * 25); }); }); E.resolveBids(g); }
     ids.forEach(p => E.IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || ns.by !== p) return; const pl = g.players[p];
@@ -35,7 +43,7 @@ function game(n) {
       if (R() < .5 && pl.cash >= 3) { pl.cash -= 3; ns.scanned = true; } if (ns.scanned && R() < .3 && pl.cash >= 6) { pl.cash -= 6; ns.fixed = true; } if (R() < .2) ns.mit = true; if (R() < .2) ns.ins = true;
       if (R() < .15 && r <= 2) ns.token = r + 2; if (R() < .3 && ids.length > 1) { ns.lic = r + 1; ns.licBy = pick(ids.filter(x => x !== p)); }
       if ((id === 'lake' || id === 'fm') && R() < .4 && ids.length > 1) ns.co = pick(ids.filter(x => x !== p)); if (R() < .1) ns.defused = true; }));
-    ids.forEach(p => { if (R() < .3) g.players[p].alert = r; }); if (R() < .5 && ids.length > 1) g.pacts.push({ a: ids[0], b: ids[1], from: r, until: r + 2, on: true });
+    ids.forEach(p => { if (R() < .3) g.players[p].alert = r; Object.keys(E.FND).forEach(f => { if (R() < .1) g.players[p].fnd[f] = 1; }); }); if (R() < .5 && ids.length > 1) g.pacts.push({ a: ids[0], b: ids[1], from: r, until: r + 2, on: true });
     if (r === 4) ids.forEach(p => g.dil[p] = pick(['disclose', 'quiet', undefined]));
     E.attack(g, r, R); E.settle(g, r);
     ids.forEach(p => { const pl = g.players[p]; assert.ok(Number.isFinite(pl.cash) && pl.cash >= 0, 'cash ' + pl.cash); assert.ok(pl.trust >= 0 && pl.trust <= 10, 'trust ' + pl.trust); }); }

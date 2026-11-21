@@ -21,7 +21,7 @@
   const pcol = id => PCOL[Math.max(0, plist().findIndex(p => p.id === id)) % PCOL.length];
   const pname = id => (PL()[id] || {}).name || '?';
   const fmt = x => (Math.round(x * 10) / 10).toString();
-  function G() { const pl = {}, bids = {}; Object.keys(PL()).forEach(id => { const p = PL()[id]; if (!p.name) return; pl[id] = { cash: p.cash, trust: p.trust, alert: p.alert }; bids[id] = p.bids || {}; });
+  function G() { const pl = {}, bids = {}; Object.keys(PL()).forEach(id => { const p = PL()[id]; if (!p.name) return; pl[id] = { cash: p.cash, trust: p.trust, alert: p.alert, fnd: p.fnd || {} }; bids[id] = p.bids || {}; });
     return { round: rd(), players: pl, nodes: JSON.parse(JSON.stringify(ND())), bids, pacts: Object.values(D.pacts || {}), dil: D.dil || {} }; }
   function toast(m) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2200); }
   const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
@@ -50,8 +50,12 @@
   function setBid(id, a) { const m = me(); const cur = +((m.bids || {})[id] || 0); a = Math.max(0, Math.round(a)); if (a - cur > m.cash - bidTotal()) { toast('Not enough cash'); buzz([40, 40]); return; }
     DB.set(BASE + '/players/' + pid + '/bids/' + id, a || null); SFX.chip(); }
   function spend(c, extra) { const m = me(); if (m.cash < c) { toast('Not enough cash (€' + c + 'M)'); buzz([40, 40]); return false; } WR(Object.assign({ ['players/' + pid + '/cash']: E.rnd(m.cash - c) }, extra)); SFX.deal(); return true; }
-  function buyCtl(arg) { if (!canAct('build')) return; const [id, kind] = String(arg).split('|'); const ns = ND()[id], c = ns.c || 0; if (c >= 4 || !E.CTLS[kind] || (ns.k || []).indexOf(kind) >= 0) return; const ft = ui.ft && rd() <= 2; const cost = costCtl(c, ft);
-    const x = { ['nodes/' + id + '/c']: c + 1, ['nodes/' + id + '/k']: (ns.k || []).concat(kind) }; if (ft && !ns.token) x['nodes/' + id + '/token'] = rd() + 2; spend(cost, x); }
+  function buyCtl(arg) { if (!canAct('build')) return; const [id, kind] = String(arg).split('|'); const ns = ND()[id], c = ns.c || 0, C = E.CT[kind]; if (!C || c >= 4 || (ns.k || []).indexOf(kind) >= 0) return;
+    if (E.slotsUsed(ns).indexOf(C.s) >= 0) { toast('You already have a ' + E.SLOTS[C.s].n + ' control here. Pick another category.'); return; }
+    const ft = ui.ft && rd() <= 2; const cost = costCtl(c, ft);
+    const x = { ['nodes/' + id + '/c']: c + 1, ['nodes/' + id + '/k']: (ns.k || []).concat(kind) }; if (ft && !ns.token) x['nodes/' + id + '/token'] = rd() + 2; ui.pick = null; spend(cost, x); }
+  function buyFnd(f) { if (!canAct('build')) return; const F = E.FND[f], m = me(); if (!F || (m.fnd || {})[f]) return; const x = { ['players/' + pid + '/fnd/' + f]: true };
+    if (f === 'eth') myNodes().forEach(id => { x['nodes/' + id + '/scanned'] = true; }); spend(F.c, x); }
   const scan = id => canAct('build') && spend(E.COST.scan, { ['nodes/' + id + '/scanned']: true });
   function treat(id, how) { if (!canAct('build')) return; const ns = ND()[id]; const p = 'nodes/' + id + '/';
     if (how === 'fix') spend(E.COST.fix, { [p + 'fixed']: true, [p + 'pause']: rd(), [p + 'acc']: null });
@@ -78,9 +82,9 @@
     WR(x); }
   const answerPact = answerOffer;
   function actCard(i) { const m = me(), c = E.CARDS[rd()][i], k = rd() + '_' + i; if (!canAct('deals') || (m.cards || {})[k]) return;
-    if (m.cash < E.CARD_COST) { toast('Not enough cash'); return; }
-    const x = { ['players/' + pid + '/cash']: E.rnd(m.cash - E.CARD_COST), ['players/' + pid + '/cards/' + k]: true };
-    if (c.real) x['players/' + pid + '/alert'] = rd(); else x['players/' + pid + '/trust'] = E.clamp(m.trust - 1); WR(x); c.real ? SFX.shield && SFX.shield() : SFX.sad && SFX.sad(); }
+    const cc = (m.fnd || {}).lit ? 1 : E.CARD_COST; if (m.cash < cc) { toast('Not enough cash'); return; }
+    const x = { ['players/' + pid + '/cash']: E.rnd(m.cash - cc), ['players/' + pid + '/cards/' + k]: true };
+    if (c.real) x['players/' + pid + '/alert'] = rd(); else if (!(m.fnd || {}).lit) x['players/' + pid + '/trust'] = E.clamp(m.trust - 1); WR(x); c.real ? SFX.shield && SFX.shield() : SFX.sad && SFX.sad(); }
   const dilemma = c => DB.set(BASE + '/dil/' + pid, c);
 
   function stepBar() { const i = E.STEPS.indexOf(sp()); return `<div class="steps">${E.STEPS.map((s, k) => `<i class="${k < i ? 'done' : k === i ? 'on' : ''}"></i>`).join('')}</div>`; }
@@ -103,8 +107,16 @@
   function pBuild() { const ids = myNodes(), r = rd(), m = me(), dis = !canAct('build');
     if (!ids.length) return '<div class="card"><h3>You own no systems yet</h3><p>Win a bid in the next round, or wait for unclaimed systems.</p></div>';
     const ftOK = r <= 2;
-    const help = `<div class="card"><div class="row"><div class="grow"><b>How controls work</b></div><button class="btn sm ghost" data-a="help">${ui.help ? 'Hide' : 'Show'}</button></div>${ui.help ? `<p class="mut" style="margin-top:8px">Each system can hold four different controls. Every control you add cuts that system's attack odds by 20% and the damage by 15%, and raises its revenue by 25% (up to three). The fourth makes it <b>Certified</b>: extra revenue, +1 Trust at the audit. A <b>★ best fit</b> control targets this system's hidden flaw and cuts odds a further 10% and damage 5%. High-risk systems need two controls or they earn half and get fined in round 4. Scan first to see the flaw.</p>${Object.keys(E.CTLS).map(k => `<p style="margin-top:6px"><b>${E.CTLS[k].i} ${E.CTLS[k].n}</b><br><span class="mut">${E.CTLS[k].d}</span></p>`).join('')}` : '<p class="mut" style="margin-top:6px">Tap Show to see what each control does.</p>'}</div>`;
-    return help + `<div class="card"><div class="row"><div class="grow"><b>Fast-track</b><div class="mut">Controls at half price, but a hidden echo token fires an incident in 2 rounds (defuse for €${E.COST.defuse}M)</div></div><button class="btn sm ${ui.ft && ftOK ? '' : 'ghost'}" data-a="ft" ${ftOK ? '' : 'disabled'}>${ui.ft && ftOK ? 'ON' : 'OFF'}</button></div></div>` +
+    const slotOrder = ['prv', 'tst', 'mon', 'own'];
+    const ctlRow = k => { const C = E.CT[k]; return `<p style="margin-top:8px"><b>${esc(C.n)}</b><br><span class="mut">${esc(C.d)}</span><br><span class="mut" style="font-size:11.5px">${esc(C.ref)}</span></p>`; };
+    const lib = ui.lib ? `<p class="mut" style="margin-top:8px">Every control cuts that system's attack odds by 20%, cuts the damage by 15% and raises its revenue by 25% (up to three). A system holds <b>one control from each of four categories</b>. All four make it <b>Certified</b>: extra revenue and +1 Trust at the audit. A <b>★ best fit</b> control targets the system's hidden flaw: a further 10% off the odds and 5% off the damage. High-risk systems need two controls or they earn half and are fined in round 4. Scan first to see the flaw.</p>` +
+      slotOrder.map(sl => `<div class="kick" style="margin-top:12px">${esc(E.SLOTS[sl].n)} · ${esc(E.SLOTS[sl].d)}</div>` + Object.keys(E.CT).filter(k => E.CT[k].s === sl).map(ctlRow).join('')).join('') +
+      `<div class="kick" style="margin-top:14px">Governance foundations · company-wide, bought once</div><p class="mut">These apply to every system you own, not one system.</p>` + Object.keys(E.FND).map(f => `<p style="margin-top:8px"><b>${esc(E.FND[f].n)}</b> <span class="mut">€${E.FND[f].c}M</span><br><span class="mut">${esc(E.FND[f].d)}</span><br><span class="mut" style="font-size:11.5px">${esc(E.FND[f].ref)}</span></p>`).join('') : '<p class="mut" style="margin-top:6px">Tap Show for all 18 controls and 8 governance measures, each in plain language with its legal reference.</p>';
+    const help = `<div class="card"><div class="row"><div class="grow"><b>Control library</b></div><button class="btn sm ghost" data-a="lib">${ui.lib ? 'Hide' : 'Show'}</button></div>${lib}</div>`;
+    const myF = m.fnd || {};
+    const fndCard = `<div class="card"><div class="kick">Governance foundations</div><p class="mut">Company-wide. Buy once, they protect all your systems.</p>` + Object.keys(E.FND).map(f => { const F = E.FND[f], own = !!myF[f];
+      return `<div style="padding:10px 0;border-top:1px solid var(--line)"><div class="row"><div class="grow"><b>${own ? '✓ ' : ''}${esc(F.n)}</b><div class="mut">${esc(F.d)}</div><div class="mut" style="font-size:11.5px">${esc(F.ref)}</div></div><button class="btn sm ${own ? 'ghost' : ''}" data-a="fnd" data-id="${f}" ${dis || own ? 'disabled' : ''}>${own ? 'In place' : '€' + F.c + 'M'}</button></div></div>`; }).join('') + '</div>';
+    return help + fndCard + `<div class="card"><div class="row"><div class="grow"><b>Fast-track</b><div class="mut">Controls at half price, but a hidden echo token fires an incident in 2 rounds (defuse for €${E.COST.defuse}M)</div></div><button class="btn sm ${ui.ft && ftOK ? '' : 'ghost'}" data-a="ft" ${ftOK ? '' : 'disabled'}>${ui.ft && ftOK ? 'ON' : 'OFF'}</button></div></div>` +
     ids.map(id => { const ns = ND()[id], N = E.NODES[id], c = ns.c || 0, sev = vsev(id), odds = E.oddsOf(id, Math.max(2, r), ns);
       const ft = ui.ft && ftOK; const cc = costCtl(c, ft);
       let v = '';
@@ -112,8 +124,10 @@
       else if (ns.fixed) v = `<div class="vul ok">✓ Fixed: ${esc(E.VULN[id])}</div>`;
       else v = `<div class="vul">⚠ ${esc(E.VULN[id])} · ${E.SEV[sev].n} · attack odds ${Math.round(odds * 100)}%${ns.mit ? ' · mitigated' : ''}${ns.ins ? ' · insured' : ''}${ns.acc ? ' · accepted' : ''}</div>`;
       return `<div class="card node ${N.cat}"><div class="row"><div class="grow"><b>${esc(nm(id))}</b> ${tierTag(id)}<div class="mut">${esc(cname(id))} · ${[0, 1, 2, 3].map(i => `<span class="cb ${i < c ? 'on' : ''}"></span>`).join('')}${c >= 4 ? ' CERTIFIED' : ''}${N.tier === 'high' && c < 2 ? ' · <span style="color:var(--coral)">needs 2 controls</span>' : ''}</div></div></div>${v}
-      <div class="mut" style="margin:10px 0 4px;font-weight:700">Add a control (€${cc}M each)${c >= 4 ? ' · all four in place: CERTIFIED' : ''}${ns.scanned ? '' : ' · scan first to see the best fit'}</div>
-      <div class="ctlg">${Object.keys(E.CTLS).map(k => { const own = (ns.k || []).indexOf(k) >= 0, fit = ns.scanned && E.MATCH[id] === k, C = E.CTLS[k]; return `<button class="ctlb ${own ? 'own' : ''} ${fit ? 'fit' : ''}" data-a="ctl" data-id="${id}|${k}" ${dis || own || c >= 4 ? 'disabled' : ''}><b>${C.i} ${own ? '✓ ' : ''}${C.n}</b><span>${C.d}</span>${fit ? '<em>★ Best fit for ' + esc(E.VULN[id]) + '</em>' : ''}</button>`; }).join('')}</div>
+      <div class="mut" style="margin:10px 0 4px;font-weight:700">Controls in place${c >= 4 ? ' · all four categories covered: CERTIFIED' : ''}</div>
+      <div>${(ns.k || []).length ? (ns.k || []).map(k => `<span class="chip ok" style="margin:0 4px 4px 0">${esc(E.CT[k] ? E.CT[k].n : k)}${ns.scanned && (E.FITS[id] || []).indexOf(k) >= 0 ? ' ★' : ''}</span>`).join('') : '<span class="mut">None yet</span>'}</div>
+      ${c >= 4 ? '' : `<div class="acts"><button class="btn sm" data-a="pick" data-id="${id}">${ui.pick === id ? 'Close' : '＋ Add a control'} · €${cc}M</button></div>`}
+      ${ui.pick === id && c < 4 ? slotOrder.map(sl => { const used = E.slotsUsed(ns).indexOf(sl) >= 0; return `<div class="kick" style="margin-top:10px">${esc(E.SLOTS[sl].n)}${used ? ' · covered ✓' : ''}</div><div class="mut" style="margin-bottom:4px">${esc(E.SLOTS[sl].d)}</div>` + (used ? '' : `<div class="ctlg">${Object.keys(E.CT).filter(k => E.CT[k].s === sl).map(k => { const C = E.CT[k], fit = ns.scanned && (E.FITS[id] || []).indexOf(k) >= 0; return `<button class="ctlb ${fit ? 'fit' : ''}" data-a="ctl" data-id="${id}|${k}" ${dis ? 'disabled' : ''}><b>${esc(C.n)}</b><span>${esc(C.d)}</span><span style="opacity:.7">${esc(C.ref)}</span>${fit ? '<em>★ Best fit for ' + esc(E.VULN[id]) + '</em>' : ''}</button>`; }).join('')}</div>`); }).join('') + (ns.scanned ? '' : '<p class="mut" style="margin-top:8px">Scan this system to see which control is the best fit.</p>') : ''}
       ${ns.scanned ? '' : `<div class="acts"><button class="btn sm ghost" data-a="scan" data-id="${id}" ${dis ? 'disabled' : ''}>🔍 Scan for hidden flaw €${E.COST.scan}M</button></div>`}
       ${ns.scanned && !ns.fixed ? `<div class="acts"><button class="btn sm ghost" data-a="fix" data-id="${id}" ${dis ? 'disabled' : ''}>🔧 Fix €${E.COST.fix}M</button><button class="btn sm ghost" data-a="mit" data-id="${id}" ${dis || ns.mit ? 'disabled' : ''}>🛡 Mitigate €${E.COST.mit}M</button><button class="btn sm ghost" data-a="ins" data-id="${id}" ${dis || ns.ins ? 'disabled' : ''}>🧾 Insure €${E.COST.ins}M</button><button class="btn sm ghost" data-a="acc" data-id="${id}" ${dis || ns.acc ? 'disabled' : ''}>✍️ Accept</button></div>` : ''}
       ${ns.token && !ns.defused ? `<div class="vul">⏱ Echo token: an incident fires in round ${ns.token}. <button class="btn sm" data-a="def" data-id="${id}" ${dis ? 'disabled' : ''}>Defuse €${E.COST.defuse}M</button></div>` : ''}</div>`; }).join(''); }
@@ -122,7 +136,7 @@
     const inc = Object.keys(offers).filter(k => offers[k].to === pid && offers[k].st === 'open' && offers[k].r === r);
     const mineN = myNodes(), hubs = mineN.filter(id => E.NODES[id].cat === 'hub' && !ND()[id].co), lender = mineN.some(id => (ND()[id].c || 0) >= 2);
     let h = '';
-    if (r >= 2) { h += `<div class="card"><div class="kick">News feed · one of these is real</div><p class="mut">Acting costs €${E.CARD_COST}M. A real warning cuts your attack odds by 20% this round. Acting on a fake costs Trust.</p>` + E.CARDS[r].map((c, i) => { const done = (m.cards || {})[r + '_' + i];
+    if (r >= 2) { h += `<div class="card"><div class="kick">News feed · one of these is real</div><p class="mut">Acting costs €${(m.fnd || {}).lit ? 1 : E.CARD_COST}M. A real warning cuts your attack odds by 20% this round. ${(m.fnd || {}).lit ? 'Your AI literacy programme means a fake costs you no Trust.' : 'Acting on a fake costs Trust.'}</p>` + E.CARDS[r].map((c, i) => { const done = (m.cards || {})[r + '_' + i];
       return `<div style="padding:10px 0;border-top:1px solid var(--line)"><div class="mut">${esc(c.n)}</div><b>${esc(c.h)}</b><div class="acts"><button class="btn sm ${done ? 'ghost' : ''}" data-a="card" data-id="${i}" ${can && !done ? '' : 'disabled'}>${done ? (c.real ? '✓ Acted · odds −20%' : '✗ Acted · it was fake') : 'Act on this'}</button></div></div>`; }).join('') + '</div>'; }
     h += `<div class="card"><div class="kick">Shared-liability pact</div><h3>Split the damage</h3><p>For 3 rounds you and a partner split cash losses from attacks 50/50.</p>`;
     h += others.length ? `<div class="acts">${others.map(o => `<button class="btn sm ghost" data-a="offer" data-id="${o.id}" ${can ? '' : 'disabled'}>${esc(o.name)}</button>`).join('')}</div>` : '<p class="mut">No other players yet.</p>'; h += '</div>';
@@ -149,7 +163,8 @@
   function pFinal() { const f = ST().final || [], mine = f.findIndex(x => x.pid === pid);
     return `<div class="card"><div class="kick">Final standings</div>${f.map((x, i) => `<div class="lead"><div class="rk">${i + 1}</div><div class="grow"><b>${esc(pname(x.pid))}</b><div class="mut">€${fmt(x.cash)}M cash · Trust ${fmt(x.trust)}</div></div><div class="big" style="font-size:30px">${Math.round(x.score)}</div></div>`).join('')}<p class="mut" style="margin-top:10px">Score = net worth × (0.6 + 0.08 × Trust)</p></div>
     <div class="card"><div class="kick">Your vulnerability register</div>${myNodes().map(id => { const ns = ND()[id], t = ns.fixed ? 'Fixed' : ns.mit ? 'Mitigated' : ns.ins ? 'Insured' : ns.acc ? 'Accepted' : ns.scanned ? 'Open' : 'Never scanned'; const cl = ns.fixed || ns.mit ? 'ok' : ns.ins ? 'warn' : 'bad';
-      return `<div style="padding:6px 0;border-bottom:1px solid var(--line)"><b>${esc(nm(id))}</b><div class="mut">${esc(E.VULN[id])} <span class="chip ${cl}">${t}</span> ${(ns.c || 0)} controls</div></div>`; }).join('') || '<p>You owned no systems.</p>'}</div>`; }
+      return `<div style="padding:6px 0;border-bottom:1px solid var(--line)"><b>${esc(nm(id))}</b><div class="mut">${esc(E.VULN[id])} <span class="chip ${cl}">${t}</span> ${(ns.k || []).map(k => esc((E.CT[k] || {}).n || k)).join(', ') || 'no controls'}</div></div>`; }).join('') || '<p>You owned no systems.</p>'}</div>
+    <div class="card"><div class="kick">Your governance foundations</div><p class="mut">${Object.keys(E.FND).filter(f => ((me() || {}).fnd || {})[f]).map(f => esc(E.FND[f].n)).join(', ') || 'None in place.'}</p></div>`; }
   function playerView() {
     const st = ST();
     if (!me()) return `<div class="ph"><div class="logo">ECHO</div><div class="tag">Every decision comes back around.<br><b>Pick a name to join</b></div><input class="txt" id="nm" maxlength="16" placeholder="Your name or team" value="${esc(ui.typed)}" autocomplete="off"><button class="btn" data-a="join">Join the game</button></div>${DB.mode === 'demo' ? '<div class="demo">DEMO MODE</div>' : ''}`;
@@ -164,7 +179,7 @@
     if (a === 'bp') { const cur = +((m.bids || {})[id] || 0), N = E.NODES[id]; return setBid(id, cur ? cur + 1 : Math.max(1, Math.round(N.price * .8))); }
     if (a === 'bm') { const cur = +((m.bids || {})[id] || 0); return setBid(id, cur - 1); }
     if (a === 'bl') return setBid(id, E.NODES[id].price);
-    if (a === 'help') { ui.help = !ui.help; return render(true); } if (a === 'ft') { ui.ft = !ui.ft; return render(true); } if (a === 'ctl') return buyCtl(id); if (a === 'scan') return scan(id);
+    if (a === 'lib') { ui.lib = !ui.lib; return render(true); } if (a === 'pick') { ui.pick = ui.pick === id ? null : id; return render(true); } if (a === 'fnd') return buyFnd(id); if (a === 'ft') { ui.ft = !ui.ft; return render(true); } if (a === 'ctl') return buyCtl(id); if (a === 'scan') return scan(id);
     if (['fix', 'mit', 'ins', 'acc', 'def'].includes(a)) return treat(id, a);
     if (a === 'offer') return offerPact(id); if (a === 'lic') { const [to, n] = id.split('|'); return sendOffer('lic', to, n); } if (a === 'co') { const [to, n] = id.split('|'); return sendOffer('co', to, n); }
     if (a === 'card') return actCard(+id); if (a === 'yes') return answerOffer(id, true); if (a === 'no') return answerOffer(id, false); if (a === 'dil') return dilemma(id); }
