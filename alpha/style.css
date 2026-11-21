@@ -93,3 +93,4 @@ table.t{width:100%;border-collapse:collapse;font-size:15px}table.t td,table.t th
 .tree{margin-bottom:10px}.tree .ar{border-left:3px solid var(--c);margin:12px 0 0 6px;padding-left:10px}.tree .ar.sub{border-left-style:dashed;margin-left:4px}.tree .ah{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;font-size:15px}
 .lf{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:12px;background:rgba(255,255,255,.05);margin-top:5px;cursor:pointer}.lf.sel{outline:2px solid var(--gold)}.lf.lk{opacity:.55}.lf b{font-size:14px}
 .lc{flex:none;width:26px;height:26px;border-radius:50%;border:2.5px solid;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#04261b}
+.dock{position:sticky;bottom:88px;z-index:15;margin:0 -4px;padding:6px 8px 2px;background:linear-gradient(180deg,rgba(11,16,38,0),rgba(11,16,38,.96) 28%)}.dock svg{width:100%;display:block}
