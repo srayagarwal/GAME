@@ -21,7 +21,7 @@
   const pcol = id => PCOL[Math.max(0, plist().findIndex(p => p.id === id)) % PCOL.length];
   const pname = id => (PL()[id] || {}).name || '?';
   const fmt = x => (Math.round(x * 10) / 10).toString();
-  function G() { const pl = {}, bids = {}; Object.keys(PL()).forEach(id => { const p = PL()[id]; if (!p.name) return; pl[id] = { cash: p.cash, trust: p.trust }; bids[id] = p.bids || {}; });
+  function G() { const pl = {}, bids = {}; Object.keys(PL()).forEach(id => { const p = PL()[id]; if (!p.name) return; pl[id] = { cash: p.cash, trust: p.trust, alert: p.alert }; bids[id] = p.bids || {}; });
     return { round: rd(), players: pl, nodes: JSON.parse(JSON.stringify(ND())), bids, pacts: Object.values(D.pacts || {}), dil: D.dil || {} }; }
   function toast(m) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2200); }
   const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
@@ -61,10 +61,26 @@
     else if (how === 'def') spend(E.COST.defuse, { [p + 'defused']: true }); }
   const ready = () => DB.set(BASE + '/players/' + pid + '/ready', rd() + ':' + sp());
   const unready = () => DB.set(BASE + '/players/' + pid + '/ready', null);
-  function offerPact(to) { const key = rd() + '_' + pid + '_' + to; if (Object.values(D.offers || {}).some(o => o.from === pid && o.r === rd())) { toast('One offer per round'); return; }
-    DB.set(BASE + '/offers/' + key, { from: pid, to, st: 'open', r: rd() }); toast('Pact offered to ' + pname(to)); }
-  function answerPact(key, yes) { const o = (D.offers || {})[key]; if (!o) return; const x = { ['offers/' + key + '/st']: yes ? 'yes' : 'no' };
-    if (yes) x['pacts/' + key] = { a: o.from, b: o.to, from: rd(), until: rd() + 2, on: true }; WR(x); }
+  const offerKey = (type, to, node) => rd() + '_' + type + '_' + pid + '_' + to + (node ? '_' + node : '');
+  function sendOffer(type, to, node) { if (type === 'lic' && !E.IDS.some(id => nodeOwn(id) === to && (ND()[id].c || 0) >= 2)) { toast(pname(to) + ' has no system with 2 controls to lend'); return; }
+     const mine = Object.values(D.offers || {}).filter(o => o.from === pid && o.r === rd() && o.type === type);
+    if (mine.length >= 2) { toast('Max 2 ' + type + ' offers per round'); return; }
+    DB.set(BASE + '/offers/' + offerKey(type, to, node), { from: pid, to, st: 'open', r: rd(), type, node: node || null }); toast('Offer sent to ' + pname(to)); }
+  const offerPact = to => sendOffer('pact', to);
+  function answerOffer(key, yes) { const o = (D.offers || {})[key]; if (!o || o.st !== 'open') return; const x = { ['offers/' + key + '/st']: yes ? 'yes' : 'no' }, r = rd();
+    if (yes) {
+      if (o.type === 'pact') x['pacts/' + key] = { a: o.from, b: o.to, from: r, until: r + 2, on: true };
+      else if (o.type === 'lic') { const ns = ND()[o.node]; if (!ns || ns.by !== o.from) { toast('That system changed hands'); return; } if (!E.IDS.some(id => nodeOwn(id) === pid && (ND()[id].c || 0) >= 2)) { toast('You need a system with 2+ controls to license'); return; }
+        x['nodes/' + o.node + '/lic'] = r + 1; x['nodes/' + o.node + '/licBy'] = pid; }
+      else if (o.type === 'co') { const ns = ND()[o.node], cost = E.rnd(E.CO_SHARE * E.NODES[o.node].price); if (!ns || ns.by !== o.from || ns.co) { toast('No longer available'); return; }
+        if (me().cash < cost) { toast('You need €' + cost + 'M to co-own'); return; }
+        x['players/' + pid + '/cash'] = E.rnd(me().cash - cost); x['players/' + o.from + '/cash'] = E.rnd((PL()[o.from].cash || 0) + cost); x['nodes/' + o.node + '/co'] = pid; } }
+    WR(x); }
+  const answerPact = answerOffer;
+  function actCard(i) { const m = me(), c = E.CARDS[rd()][i], k = rd() + '_' + i; if (!canAct('deals') || (m.cards || {})[k]) return;
+    if (m.cash < E.CARD_COST) { toast('Not enough cash'); return; }
+    const x = { ['players/' + pid + '/cash']: E.rnd(m.cash - E.CARD_COST), ['players/' + pid + '/cards/' + k]: true };
+    if (c.real) x['players/' + pid + '/alert'] = rd(); else x['players/' + pid + '/trust'] = E.clamp(m.trust - 1); WR(x); c.real ? SFX.shield && SFX.shield() : SFX.sad && SFX.sad(); }
   const dilemma = c => DB.set(BASE + '/dil/' + pid, c);
 
   function stepBar() { const i = E.STEPS.indexOf(sp()); return `<div class="steps">${E.STEPS.map((s, k) => `<i class="${k < i ? 'done' : k === i ? 'on' : ''}"></i>`).join('')}</div>`; }
@@ -98,13 +114,27 @@
       <div class="acts"><button class="btn sm" data-a="ctl" data-id="${id}" ${dis || c >= 4 ? 'disabled' : ''}>＋ Control €${cc}M</button>${ns.scanned ? '' : `<button class="btn sm ghost" data-a="scan" data-id="${id}" ${dis ? 'disabled' : ''}>🔍 Scan €${E.COST.scan}M</button>`}</div>
       ${ns.scanned && !ns.fixed ? `<div class="acts"><button class="btn sm ghost" data-a="fix" data-id="${id}" ${dis ? 'disabled' : ''}>🔧 Fix €${E.COST.fix}M</button><button class="btn sm ghost" data-a="mit" data-id="${id}" ${dis || ns.mit ? 'disabled' : ''}>🛡 Mitigate €${E.COST.mit}M</button><button class="btn sm ghost" data-a="ins" data-id="${id}" ${dis || ns.ins ? 'disabled' : ''}>🧾 Insure €${E.COST.ins}M</button><button class="btn sm ghost" data-a="acc" data-id="${id}" ${dis || ns.acc ? 'disabled' : ''}>✍️ Accept</button></div>` : ''}
       ${ns.token && !ns.defused ? `<div class="vul">⏱ Echo token: an incident fires in round ${ns.token}. <button class="btn sm" data-a="def" data-id="${id}" ${dis ? 'disabled' : ''}>Defuse €${E.COST.defuse}M</button></div>` : ''}</div>`; }).join(''); }
-  function pDeals() { const others = plist().filter(p => p.id !== pid), offers = D.offers || {}, pacts = Object.values(D.pacts || {}).filter(p => p.on && (p.a === pid || p.b === pid) && p.until >= rd());
-    const inc = Object.keys(offers).filter(k => offers[k].to === pid && offers[k].st === 'open' && offers[k].r === rd());
-    let h = `<div class="card"><div class="kick">Shared-liability pact</div><h3>Split the damage</h3><p>For 3 rounds you and a partner split your cash losses from attacks 50/50. Good when one of you is safer than the other.</p>`;
-    h += others.length ? `<div class="acts">${others.map(o => `<button class="btn sm ghost" data-a="offer" data-id="${o.id}" ${canAct('deals') ? '' : 'disabled'}>${esc(o.name)}</button>`).join('')}</div>` : '<p class="mut">No other players yet.</p>'; h += '</div>';
-    inc.forEach(k => { h += `<div class="card"><b>${esc(pname(offers[k].from))}</b> offers a pact.<div class="acts"><button class="btn sm" data-a="yes" data-id="${k}">Accept</button><button class="btn sm ghost" data-a="no" data-id="${k}">Decline</button></div></div>`; });
+  function pDeals() { const others = plist().filter(p => p.id !== pid), offers = D.offers || {}, r = rd(), can = canAct('deals'), m = me();
+    const pacts = Object.values(D.pacts || {}).filter(p => p.on && (p.a === pid || p.b === pid) && p.until >= r);
+    const inc = Object.keys(offers).filter(k => offers[k].to === pid && offers[k].st === 'open' && offers[k].r === r);
+    const mineN = myNodes(), hubs = mineN.filter(id => E.NODES[id].cat === 'hub' && !ND()[id].co), lender = mineN.some(id => (ND()[id].c || 0) >= 2);
+    let h = '';
+    if (r >= 2) { h += `<div class="card"><div class="kick">News feed · one of these is real</div><p class="mut">Acting costs €${E.CARD_COST}M. A real warning cuts your attack odds by 20% this round. Acting on a fake costs Trust.</p>` + E.CARDS[r].map((c, i) => { const done = (m.cards || {})[r + '_' + i];
+      return `<div style="padding:10px 0;border-top:1px solid var(--line)"><div class="mut">${esc(c.n)}</div><b>${esc(c.h)}</b><div class="acts"><button class="btn sm ${done ? 'ghost' : ''}" data-a="card" data-id="${i}" ${can && !done ? '' : 'disabled'}>${done ? (c.real ? '✓ Acted · odds −20%' : '✗ Acted · it was fake') : 'Act on this'}</button></div></div>`; }).join('') + '</div>'; }
+    h += `<div class="card"><div class="kick">Shared-liability pact</div><h3>Split the damage</h3><p>For 3 rounds you and a partner split cash losses from attacks 50/50.</p>`;
+    h += others.length ? `<div class="acts">${others.map(o => `<button class="btn sm ghost" data-a="offer" data-id="${o.id}" ${can ? '' : 'disabled'}>${esc(o.name)}</button>`).join('')}</div>` : '<p class="mut">No other players yet.</p>'; h += '</div>';
+    const need = mineN.filter(id => E.NODES[id].cat !== 'hub' || true).filter(id => !ND()[id].lic || ND()[id].lic < r);
+    h += `<div class="card"><div class="kick">Control licence</div><h3>Borrow a control</h3><p>Ask a player with a 2-control system to lend you one control level on a system of yours for 2 rounds. They take 25% of its revenue and share the blame if it is hit.</p>`;
+    h += !need.length ? '<p class="mut">You have no systems to cover.</p>' : need.map(id => `<div style="padding:6px 0;border-top:1px solid var(--line)"><b style="font-size:14px">${esc(nm(id))}</b><div class="acts">${others.map(o => `<button class="btn sm ghost" data-a="lic" data-id="${o.id}|${id}" ${can ? '' : 'disabled'}>from ${esc(o.name)}</button>`).join('')}</div></div>`).join(''); h += '</div>';
+    h += `<div class="card"><div class="kick">Pipeline co-ownership</div><h3>Share a data pipeline or model</h3><p>Sell half of a shared system you own for ${Math.round(E.CO_SHARE * 100)}% of its list price. Revenue, damage and Trust loss are then split 50/50.</p>`;
+    h += hubs.length ? hubs.map(id => `<div style="padding:6px 0;border-top:1px solid var(--line)"><b style="font-size:14px">${esc(nm(id))}</b> <span class="mut">€${E.rnd(E.CO_SHARE * E.NODES[id].price)}M</span><div class="acts">${others.map(o => `<button class="btn sm ghost" data-a="co" data-id="${o.id}|${id}" ${can ? '' : 'disabled'}>offer ${esc(o.name)}</button>`).join('')}</div></div>`).join('') : '<p class="mut">You own no unshared pipeline or model.</p>'; h += '</div>';
+    const lbl = { pact: 'a shared-liability pact', lic: 'to license a control to', co: 'half of' };
+    inc.forEach(k => { const o = offers[k], what = o.type === 'pact' ? 'offers a shared-liability pact' : o.type === 'lic' ? `asks you to license a control to <b>${esc(nm(o.node))}</b> (you earn 25% of its revenue)` : `offers you half of <b>${esc(nm(o.node))}</b> for €${E.rnd(E.CO_SHARE * E.NODES[o.node].price)}M`;
+      h += `<div class="card"><b>${esc(pname(o.from))}</b> ${what}.<div class="acts"><button class="btn sm" data-a="yes" data-id="${k}">Accept</button><button class="btn sm ghost" data-a="no" data-id="${k}">Decline</button></div></div>`; });
     pacts.forEach(p => { h += `<div class="card"><span class="chip ok">PACT</span> with <b>${esc(pname(p.a === pid ? p.b : p.a))}</b> until round ${p.until}</div>`; });
-    if (rd() === 4) { const d = (D.dil || {})[pid]; h += `<div class="card"><div class="kick">Final dilemma</div><h3>A flaw has been found</h3><p>An internal review found a flaw in one of your models that regulators don't know about yet.</p><div class="acts"><button class="btn sm ${d === 'disclose' ? '' : 'ghost'}" data-a="dil" data-id="disclose">📣 Disclose (−€3M, +1 Trust)</button><button class="btn sm ${d === 'quiet' ? '' : 'ghost'}" data-a="dil" data-id="quiet">🤫 Stay quiet (50% it leaks: −3 Trust)</button></div><p class="mut" style="margin-top:8px">${d ? 'Chosen: ' + d : 'No choice means staying quiet.'}</p></div>`; }
+    E.IDS.forEach(id => { const ns = ND()[id]; if (!ns) return; if (ns.co && (ns.by === pid || ns.co === pid)) h += `<div class="card"><span class="chip ok">CO-OWNED</span> <b>${esc(nm(id))}</b> with ${esc(pname(ns.by === pid ? ns.co : ns.by))}</div>`;
+      if (ns.lic >= r && (ns.by === pid || ns.licBy === pid)) h += `<div class="card"><span class="chip ok">LICENCE</span> <b>${esc(nm(id))}</b> · ${ns.by === pid ? 'covered by ' + esc(pname(ns.licBy)) : 'you lend a control'} until round ${ns.lic}</div>`; });
+    if (r === 4) { const d = (D.dil || {})[pid]; h += `<div class="card"><div class="kick">Final dilemma</div><h3>A flaw has been found</h3><p>An internal review found a flaw in one of your models that regulators don't know about yet.</p><div class="acts"><button class="btn sm ${d === 'disclose' ? '' : 'ghost'}" data-a="dil" data-id="disclose">📣 Disclose (−€3M, +1 Trust)</button><button class="btn sm ${d === 'quiet' ? '' : 'ghost'}" data-a="dil" data-id="quiet">🤫 Stay quiet (50% it leaks: −3 Trust)</button></div><p class="mut" style="margin-top:8px">${d ? 'Chosen: ' + d : 'No choice means staying quiet.'}</p></div>`; }
     return h; }
   function pAttack() { const a = ST().attack, mine = a ? (a.events || []).filter(e => e.by === pid) : [];
     return `<div class="card"><div class="kick">Attack phase · the only luck in the game</div><h3>🎲 Watch the projector</h3><p>${R().n === 1 ? 'Launch round: no attacks yet.' : 'Every open vulnerability is rolled against its odds.'}</p></div>` +
@@ -133,7 +163,8 @@
     if (a === 'bl') return setBid(id, E.NODES[id].price);
     if (a === 'ft') { ui.ft = !ui.ft; return render(true); } if (a === 'ctl') return buyCtl(id); if (a === 'scan') return scan(id);
     if (['fix', 'mit', 'ins', 'acc', 'def'].includes(a)) return treat(id, a);
-    if (a === 'offer') return offerPact(id); if (a === 'yes') return answerPact(id, true); if (a === 'no') return answerPact(id, false); if (a === 'dil') return dilemma(id); }
+    if (a === 'offer') return offerPact(id); if (a === 'lic') { const [to, n] = id.split('|'); return sendOffer('lic', to, n); } if (a === 'co') { const [to, n] = id.split('|'); return sendOffer('co', to, n); }
+    if (a === 'card') return actCard(+id); if (a === 'yes') return answerOffer(id, true); if (a === 'no') return answerOffer(id, false); if (a === 'dil') return dilemma(id); }
 
   /* ======================= BOARD ======================= */
   const CATCOL = { cus: '#5bc0eb', rsk: '#e5484d', ops: '#f39c3d', adv: '#3dbb73', hub: '#c9d2f2' };
@@ -154,10 +185,10 @@
     const cur = s === 'attack' && idx >= 0 ? evs[idx] : null;
     const nodeHTML = E.IDS.map(id => { const N = E.NODES[id], ns = nodes[id] || {}, by = ns.by, [x, y] = N.pos, c = ns.c || 0; let bd = '', bc = '#4a5fa8';
       if (N.banned) { bd = '⛔ WITHDRAWN · PROHIBITED'; bc = '#d7263d'; }
-      else if (by) { if (ns.fixed) { bd = '✓ Fixed'; bc = '#2a9d6b'; } else if (ns.scanned) { const sv = E.sevOf(id, Math.max(2, r)); bd = '⚠ ' + E.VULN[id] + ' · ' + E.SEV[sv].n + ' ' + Math.round(E.oddsOf(id, Math.max(2, r), ns) * 100) + '%' + (ns.mit ? ' · mitigated' : '') + (ns.ins ? ' · insured' : '') + (ns.acc ? ' · accepted' : ''); bc = ns.mit || ns.ins ? '#2e7dd1' : '#b8860b'; } else { bd = '? Unscanned'; bc = '#555'; } }
+      else if (by) { if (ns.fixed) { bd = '✓ Fixed'; bc = '#2a9d6b'; } else if (ns.scanned) { const sv = E.sevOf(id, Math.max(2, r)); bd = '⚠ ' + E.VULN[id] + ' · ' + E.SEV[sv].n + ' ' + Math.round(E.oddsOf(id, Math.max(2, r), ns) * 100) + '%' + (ns.mit ? ' · mitigated' : '') + (ns.ins ? ' · insured' : '') + (ns.acc ? ' · accepted' : '') + ((ns.lic || 0) >= r ? ' · licensed' : ''); bc = ns.mit || ns.ins ? '#2e7dd1' : '#b8860b'; } else { bd = '? Unscanned'; bc = '#555'; } }
       else { bd = N.tier === 'shared' ? 'SHARED' : E.TIERN[N.tier]; bc = { min: '#3a8a5a', lim: '#2e7dd1', high: '#e68a00', shared: '#4a5fa8' }[N.tier]; if (N.tier !== 'shared') bd += ' · €' + N.price + 'M'; }
       const isHit = hitIds[id], isDown = down && id === 'fm', spot = cur && cur.k === id;
-      const owner = isDown ? '<span class="ow" style="background:#ff5d73;color:#fff">ZERO-DAY · OFFLINE</span>' : by ? `<span class="ow" style="background:${pcol(by)}">${esc(pname(by))}</span>` : '<span class="ow un">Unclaimed</span>';
+      const owner = isDown ? '<span class="ow" style="background:#ff5d73;color:#fff">ZERO-DAY · OFFLINE</span>' : by ? `<span class="ow" style="background:${pcol(by)}">${esc(pname(by))}${ns.co ? ' + ' + esc(pname(ns.co)) : ''}</span>` : '<span class="ow un">Unclaimed</span>';
       return `<div class="bnd ${N.banned ? 'ban' : ''} ${isHit || isDown ? 'hit' : ''} ${spot ? 'spot' : ''}" style="left:${x - 125}px;top:${y - 79}px;border-color:${by ? pcol(by) : 'rgba(255,255,255,.2)'}"><div class="band" style="background:${CATCOL[N.cat]}"></div><div class="n">${esc(nm(id))}</div><div class="s">${esc(cname(id))}</div><div class="o">${N.banned ? '' : owner}<span class="pp">${[0, 1, 2, 3].map(i => `<i class="${by && i < c ? 'on' : ''}"></i>`).join('')}</span></div><div class="bd" style="background:${bc}">${esc(bd)}</div></div>`; }).join('');
     const ban = { flip: ['🔄 FLIP · ' + R().flip, '#4a5fd6'], bid: ['🤝 Sealed bids open', '#2a56a0'], build: ['🛠 Build · scan · treat', '#2a56a0'], deals: ['🤝 Deals' + (r === 4 ? ' · final dilemma' : ''), '#2a56a0'], attack: [r === 1 ? 'Launch round · no attacks' : '🎲 ATTACK PHASE · the only luck in the game', '#d7263d'], settle: ['📊 Settle · revenue and damage', '#2a9d6b'] }[s];
     let spotP = '';

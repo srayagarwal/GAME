@@ -38,17 +38,25 @@
     { n: 4, name: 'Reckoning', theme: 'Accountability and audit', flip: 'Regulator view', more: 'Audit: unscanned or accepted vulnerabilities cost Trust, uncontrolled high-risk systems are fined. A final dilemma decides the last Trust swing.', attacks: true } ];
   const STEPS = ['flip', 'bid', 'build', 'deals', 'attack', 'settle'];
   const STEPN = { flip: 'Flip', bid: 'Bid', build: 'Build', deals: 'Deals', attack: 'Attack', settle: 'Settle' };
+  const effC = (ns, r) => { const c = (ns && ns.c) || 0; return c >= 4 ? c : Math.min(3, c + (ns && (ns.lic || 0) >= r ? 1 : 0)); };
   const ctlF = (c, a, b) => Math.pow(a, Math.min(c, 3)) * (c >= 4 ? b : 1);
   const sevOf = (id, r) => { const n = NODES[id]; return n.agentic && r >= 3 ? UP[n.sev] : n.sev; };
-  const oddsOf = (id, r, ns) => { if (!ns || ns.fixed || !MULT[r]) return 0; if (id === 'fm' && r === 3) return .9; return Math.min(.95, SEV[sevOf(id, r)].p * MULT[r] * ctlF(ns.c || 0, .8, .9)); };
+  const oddsOf = (id, r, ns) => { if (!ns || ns.fixed || !MULT[r]) return 0; if (id === 'fm' && r === 3) return .9; return Math.min(.95, SEV[sevOf(id, r)].p * MULT[r] * ctlF(effC(ns, r), .8, .9)); };
   const nameOf = (pack, id) => (PACKS[pack] || PACKS.banking).n[id];
   const revOf = (g, id, r, trust) => {
     const ns = g.nodes[id], N = NODES[id]; if (!ns || !ns.by || ns.pause === r) return 0;
-    let b = RATE[N.tier] * N.price * (1 + .25 * Math.min(ns.c || 0, 3) + ((ns.c || 0) >= 4 ? .125 : 0));
-    if (N.agentic && r >= 3) b *= 1.5; if (N.tier === 'high' && (ns.c || 0) < 2) b *= .5;
+    const ce = effC(ns, r); let b = RATE[N.tier] * N.price * (1 + .25 * Math.min(ce, 3) + ((ns.c || 0) >= 4 ? .125 : 0));
+    if (N.agentic && r >= 3) b *= 1.5; if (N.tier === 'high' && ce < 2) b *= .5;
     b *= trust >= 7 ? 1.1 : trust <= 3 ? .75 : 1;
     if (N.cat !== 'hub') { const mine = IDS.filter(x => NODES[x].cat === N.cat && !NODES[x].banned); if (mine.length === 3 && mine.every(x => g.nodes[x] && g.nodes[x].by === ns.by)) b *= 1.2; }
     if ((ns.c || 0) >= 4 && r === 4) b *= 1.15; return b; };
+  const holders = ns => ns.co ? [[ns.by, .5], [ns.co, .5]] : [[ns.by, 1]];
+  const CARDS = [null,
+    [{ real: true, h: 'Regulator guidance: high-risk systems need two controls before the audit', n: 'Official guidance' }, { real: false, h: 'Blog: "Controls are optional if your vendor is certified"', n: 'Unverified post' }],
+    [{ real: true, h: 'Security bulletin: attackers are probing exposed AI systems this round', n: 'Security bulletin' }, { real: false, h: 'Influencer: "Insurance is pointless, attackers only hit big firms"', n: 'Social media' }],
+    [{ real: true, h: 'Vendor advisory: a flaw is being exploited in a shared model', n: 'Vendor advisory' }, { real: false, h: 'Forum: "The model flaw is a hoax, ignore the patch"', n: 'Anonymous forum' }],
+    [{ real: true, h: 'Auditor notice: documented controls are scored first', n: 'Auditor notice' }, { real: false, h: 'Rumour: "The regulator audit has been cancelled"', n: 'Rumour' }]];
+  const CARD_COST = 3, ALERT = .8, LIC_SHARE = .25, CO_SHARE = .4;
   const clamp = t => Math.max(0, Math.min(10, t));
   const rnd = x => Math.round(x * 10) / 10;
   /* sealed bids -> owners. g.bids[pid][id]=amount. Highest bid wins; ties go to the player with least cash. */
@@ -61,33 +69,44 @@
   function attack(g, r, rng) {
     const ev = [], loss = {}, tl = {}, hitP = {}, echoT = {}, add = (o, k, v) => o[k] = (o[k] || 0) + v;
     if (MULT[r]) {
-      IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by || ns.fixed) return; const p = oddsOf(id, r, ns), roll = rng(); ev.push({ t: 'atk', k: id, by: ns.by, p, roll, hit: roll < p, sev: sevOf(id, r), echo: [] }); });
-      ev.filter(e => e.hit).forEach(e => { const ns = g.nodes[e.k], d = SEV[e.sev].d * ctlF(ns.c || 0, .85, .95) * (ns.mit ? .5 : 1);
-        e.dmg = rnd(d); add(loss, e.by, ns.ins ? d * .3 : d); add(tl, e.by, SEV[e.sev].t * (ns.mit ? .5 : 1)); hitP[e.by] = 1;
-        NB[e.k].forEach(nb => { const nn = g.nodes[nb]; if (!nn || !nn.by) return; const dd = SEV[e.sev].d * .5 * ctlF(nn.c || 0, .85, 1); add(loss, nn.by, nn.ins ? dd * .3 : dd); e.echo.push(nb); if (nn.by !== ns.by) echoT[nn.by] = 1; }); });
-      IDS.forEach(id => { const ns = g.nodes[id]; if (ns && ns.by && ns.token === r && !ns.defused) { add(loss, ns.by, 6 * ctlF(ns.c || 0, .85, 1)); add(tl, ns.by, 1); ev.push({ t: 'token', k: id, by: ns.by, hit: true, dmg: rnd(6 * ctlF(ns.c || 0, .85, 1)), sev: 'M', p: 1, roll: 0, echo: [] }); hitP[ns.by] = 1; } });
+      IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by || ns.fixed) return; const al = (g.players[ns.by] && g.players[ns.by].alert === r) ? ALERT : 1;
+        const p = Math.min(.95, oddsOf(id, r, ns) * al), roll = rng(); ev.push({ t: 'atk', k: id, by: ns.by, co: ns.co || null, p, roll, hit: roll < p, sev: sevOf(id, r), echo: [] }); });
+      ev.filter(e => e.hit).forEach(e => { const ns = g.nodes[e.k], ce = effC(ns, r), d = SEV[e.sev].d * ctlF(ce, .85, .95) * (ns.mit ? .5 : 1);
+        e.dmg = rnd(d); const lt = SEV[e.sev].t * (ns.mit ? .5 : 1);
+        holders(ns).forEach(([pid, sh]) => { add(loss, pid, (ns.ins ? d * .3 : d) * sh); add(tl, pid, lt * sh); hitP[pid] = 1; });
+        if ((ns.lic || 0) >= r && ns.licBy && g.players[ns.licBy]) add(tl, ns.licBy, 1); // lender shares the blame
+        NB[e.k].forEach(nb => { const nn = g.nodes[nb]; if (!nn || !nn.by) return; const dd = SEV[e.sev].d * .5 * ctlF(effC(nn, r), .85, 1); e.echo.push(nb);
+          holders(nn).forEach(([pid, sh]) => { add(loss, pid, (nn.ins ? dd * .3 : dd) * sh); if (pid !== ns.by && pid !== ns.co) echoT[pid] = 1; }); }); });
+      IDS.forEach(id => { const ns = g.nodes[id]; if (ns && ns.by && ns.token === r && !ns.defused) { const dm = 6 * ctlF(effC(ns, r), .85, 1);
+        holders(ns).forEach(([pid, sh]) => { add(loss, pid, dm * sh); add(tl, pid, sh); hitP[pid] = 1; });
+        ev.push({ t: 'token', k: id, by: ns.by, hit: true, dmg: rnd(dm), sev: 'M', p: 1, roll: 0, echo: [] }); } });
     }
     if (r === 4) Object.keys(g.players).forEach(pid => { const d = (g.dil || {})[pid];
       if (d === 'disclose') { add(loss, pid, 3); add(tl, pid, -1); ev.push({ t: 'dil', by: pid, k: 'dilemma', hit: false, label: 'Disclosed the flaw', p: 0, roll: 0, echo: [] }); }
       else { const roll = rng(), leak = roll < .5; if (leak) add(tl, pid, 3); ev.push({ t: 'dil', by: pid, k: 'dilemma', hit: leak, label: leak ? 'Stayed quiet · it leaked' : 'Stayed quiet · got away with it', p: .5, roll, echo: [] }); } });
     // shared-liability pacts split cash losses
-    (g.pacts || []).filter(p => p.on && p.from <= r && p.until >= r).forEach(p => { const t = (loss[p.a] || 0) + (loss[p.b] || 0); loss[p.a] = t / 2; loss[p.b] = t / 2; });
-    Object.keys(g.players).forEach(pid => { const p = g.players[pid]; p.cash = rnd(p.cash - (loss[pid] || 0)); let t = p.trust - (tl[pid] || 0) - (echoT[pid] ? 1 : 0); if (!hitP[pid] && r >= 2) t += 1; p.trust = clamp(t);
-      });
+    (g.pacts || []).filter(p => p.on && p.from <= r && p.until >= r && g.players[p.a] && g.players[p.b]).forEach(p => { const t = (loss[p.a] || 0) + (loss[p.b] || 0); loss[p.a] = t / 2; loss[p.b] = t / 2; });
+    Object.keys(g.players).forEach(pid => { const p = g.players[pid]; let t = p.trust - (tl[pid] || 0) - (echoT[pid] ? 1 : 0); if (!hitP[pid] && r >= 2) t += 1;
+      t -= payOut(p, loss[pid] || 0); p.trust = clamp(t); });
     return { ev, loss, tl, echoT }; }
-  /* settle: revenue, then the round-4 audit */
+  /* cash never goes below zero: an unpaid shortfall becomes a regulator enforcement, -1 Trust per started EUR 5M */
+  function payOut(p, x) { p.cash = rnd(p.cash - x); if (p.cash >= 0) return 0; const sh = -p.cash; p.cash = 0; p.debt = rnd((p.debt || 0) + sh); return Math.ceil(sh / 5); }
+  /* settle: revenue (with licence fees and co-owner splits), then the round-4 audit */
   function settle(g, r) {
-    const out = {};
-    Object.keys(g.players).forEach(pid => { const p = g.players[pid]; let rev = 0; IDS.forEach(id => { if (g.nodes[id] && g.nodes[id].by === pid) rev += revOf(g, id, r, p.trust); }); p.cash = rnd(p.cash + rev); out[pid] = { rev: rnd(rev), lines: [] }; });
+    const out = {}, inc = {}; Object.keys(g.players).forEach(pid => { inc[pid] = 0; out[pid] = { rev: 0, lines: [] }; });
+    IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by || !g.players[ns.by]) return; let rev = revOf(g, id, r, g.players[ns.by].trust); if (!rev) return;
+      if ((ns.lic || 0) >= r && ns.licBy && g.players[ns.licBy]) { const fee = rev * LIC_SHARE; inc[ns.licBy] += fee; rev -= fee; out[ns.licBy].lines.push('Licence fee +€' + rnd(fee) + 'M'); }
+      holders(ns).forEach(([pid, sh]) => { inc[pid] += rev * sh; }); });
+    Object.keys(g.players).forEach(pid => { const p = g.players[pid]; p.cash = rnd(p.cash + inc[pid]); out[pid].rev = rnd(inc[pid]); });
     if (r === 4) Object.keys(g.players).forEach(pid => { const p = g.players[pid]; let t = p.trust;
       IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || ns.by !== pid) return; const N = NODES[id];
-        if (N.tier === 'high' && (ns.c || 0) < 2) { p.cash = rnd(p.cash - 6); t -= 2; out[pid].lines.push('Fined €6M · high-risk system without 2 controls'); }
+        if (N.tier === 'high' && effC(ns, r) < 2) { t -= payOut(p, 6) + 2; out[pid].lines.push('Fined €6M · high-risk system without 2 controls'); }
         if (!ns.fixed && !ns.mit && (!ns.scanned || ns.acc)) { t -= 1; out[pid].lines.push(ns.scanned ? 'Accepted risk logged against you' : 'Never scanned: negligence'); }
         if ((ns.c || 0) >= 4) { t += 1; out[pid].lines.push('Certified system +1 Trust'); } });
       p.trust = clamp(t); });
     return out; }
   const owned = (g, pid) => IDS.filter(id => g.nodes[id] && g.nodes[id].by === pid);
-  function worth(g, pid) { let v = g.players[pid].cash; owned(g, pid).forEach(id => { const c = g.nodes[id].c || 0; v += .8 * NODES[id].price + 2 * c + (c >= 4 ? 3 : 0); }); return v; }
+  function worth(g, pid) { let v = g.players[pid].cash; IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by) return; const h = holders(ns).find(x => x[0] === pid); if (!h) return; const c = ns.c || 0; v += h[1] * (.8 * NODES[id].price + 2 * c + (c >= 4 ? 3 : 0)); }); return v; }
   const finalScore = (g, pid) => worth(g, pid) * (0.6 + 0.08 * g.players[pid].trust);
-  window.ECHO = { SEV, COST, START, TOPUP, MULT, RATE, TIERN, NODES, LINKS, NB, IDS, VULN, PACKS, ROUNDS, STEPS, STEPN, ctlF, sevOf, oddsOf, nameOf, revOf, resolveBids, attack, settle, owned, worth, finalScore, clamp, rnd, CATS };
+  window.ECHO = { effC, holders, payOut, CARDS, CARD_COST, ALERT, LIC_SHARE, CO_SHARE, SEV, COST, START, TOPUP, MULT, RATE, TIERN, NODES, LINKS, NB, IDS, VULN, PACKS, ROUNDS, STEPS, STEPN, ctlF, sevOf, oddsOf, nameOf, revOf, resolveBids, attack, settle, owned, worth, finalScore, clamp, rnd, CATS };
 })();
