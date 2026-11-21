@@ -3,6 +3,13 @@
   const SEV = { L: { p: .10, d: 4, t: 0, n: 'Low' }, M: { p: .25, d: 9, t: .5, n: 'Medium' }, H: { p: .40, d: 18, t: 1, n: 'High' }, C: { p: .60, d: 30, t: 2, n: 'Critical' } };
   const UP = { L: 'M', M: 'H', H: 'C', C: 'C' };
   const COST = { ctl: 5, ft: 3, scan: 3, fix: 6, mit: 4, ins: 3, defuse: 3 };
+  const CTLS = { mon: { n: 'Monitoring & alerts', i: '📡', d: 'Watches the system live and flags drift, misuse or attacks early.' },
+    hum: { n: 'Human oversight', i: '🧑‍⚖️', d: 'A named person reviews and can stop what the system does.' },
+    tst: { n: 'Testing & red-teaming', i: '🎯', d: 'Attacks and stress-tests the system before real attackers do.' },
+    doc: { n: 'Documentation & audit trail', i: '📑', d: 'Logs, records and ownership that a regulator can inspect.' } };
+  const MATCH = { chat: 'tst', compl: 'tst', cred: 'doc', fraud: 'mon', aml: 'mon', doc: 'hum', coll: 'hum', pay: 'hum', robo: 'hum', suit: 'doc', wealth: 'tst', lake: 'mon', fm: 'tst', offer: 'hum' };
+  const FIT_ODDS = .9, FIT_DMG = .95;
+  const hasFit = (id, ns) => !!(ns && ns.k && MATCH[id] && ns.k.indexOf(MATCH[id]) >= 0);
   const START = 50, TOPUP = [0, 0, 25, 25, 15], MULT = [0, 0, 1.0, 1.4, 1.0];
   const RATE = { min: .49, lim: .588, high: .70, shared: .42 };
   const TIERN = { min: 'MINIMAL', lim: 'LIMITED RISK', high: 'HIGH-RISK', shared: 'SHARED' };
@@ -41,7 +48,7 @@
   const effC = (ns, r) => { const c = (ns && ns.c) || 0; return c >= 4 ? c : Math.min(3, c + (ns && (ns.lic || 0) >= r ? 1 : 0)); };
   const ctlF = (c, a, b) => Math.pow(a, Math.min(c, 3)) * (c >= 4 ? b : 1);
   const sevOf = (id, r) => { const n = NODES[id]; return n.agentic && r >= 3 ? UP[n.sev] : n.sev; };
-  const oddsOf = (id, r, ns) => { if (!ns || ns.fixed || !MULT[r]) return 0; if (id === 'fm' && r === 3) return .9; return Math.min(.95, SEV[sevOf(id, r)].p * MULT[r] * ctlF(effC(ns, r), .8, .9)); };
+  const oddsOf = (id, r, ns) => { if (!ns || ns.fixed || !MULT[r]) return 0; if (id === 'fm' && r === 3) return .9; return Math.min(.95, SEV[sevOf(id, r)].p * MULT[r] * ctlF(effC(ns, r), .8, .9) * (hasFit(id, ns) ? FIT_ODDS : 1)); };
   const nameOf = (pack, id) => (PACKS[pack] || PACKS.banking).n[id];
   const revOf = (g, id, r, trust) => {
     const ns = g.nodes[id], N = NODES[id]; if (!ns || !ns.by || ns.pause === r) return 0;
@@ -71,7 +78,7 @@
     if (MULT[r]) {
       IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by || ns.fixed) return; const al = (g.players[ns.by] && g.players[ns.by].alert === r) ? ALERT : 1;
         const p = Math.min(.95, oddsOf(id, r, ns) * al), roll = rng(); ev.push({ t: 'atk', k: id, by: ns.by, co: ns.co || null, p, roll, hit: roll < p, sev: sevOf(id, r), echo: [] }); });
-      ev.filter(e => e.hit).forEach(e => { const ns = g.nodes[e.k], ce = effC(ns, r), d = SEV[e.sev].d * ctlF(ce, .85, .95) * (ns.mit ? .5 : 1);
+      ev.filter(e => e.hit).forEach(e => { const ns = g.nodes[e.k], ce = effC(ns, r), d = SEV[e.sev].d * ctlF(ce, .85, .95) * (hasFit(e.k, ns) ? FIT_DMG : 1) * (ns.mit ? .5 : 1);
         e.dmg = rnd(d); const lt = SEV[e.sev].t * (ns.mit ? .5 : 1);
         holders(ns).forEach(([pid, sh]) => { add(loss, pid, (ns.ins ? d * .3 : d) * sh); add(tl, pid, lt * sh); hitP[pid] = 1; });
         if ((ns.lic || 0) >= r && ns.licBy && g.players[ns.licBy]) add(tl, ns.licBy, 1); // lender shares the blame
@@ -108,5 +115,5 @@
   const owned = (g, pid) => IDS.filter(id => g.nodes[id] && g.nodes[id].by === pid);
   function worth(g, pid) { let v = g.players[pid].cash; IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by) return; const h = holders(ns).find(x => x[0] === pid); if (!h) return; const c = ns.c || 0; v += h[1] * (.8 * NODES[id].price + 2 * c + (c >= 4 ? 3 : 0)); }); return v; }
   const finalScore = (g, pid) => worth(g, pid) * (0.6 + 0.08 * g.players[pid].trust);
-  window.ECHO = { effC, holders, payOut, CARDS, CARD_COST, ALERT, LIC_SHARE, CO_SHARE, SEV, COST, START, TOPUP, MULT, RATE, TIERN, NODES, LINKS, NB, IDS, VULN, PACKS, ROUNDS, STEPS, STEPN, ctlF, sevOf, oddsOf, nameOf, revOf, resolveBids, attack, settle, owned, worth, finalScore, clamp, rnd, CATS };
+  window.ECHO = { CTLS, MATCH, hasFit, FIT_ODDS, FIT_DMG, effC, holders, payOut, CARDS, CARD_COST, ALERT, LIC_SHARE, CO_SHARE, SEV, COST, START, TOPUP, MULT, RATE, TIERN, NODES, LINKS, NB, IDS, VULN, PACKS, ROUNDS, STEPS, STEPN, ctlF, sevOf, oddsOf, nameOf, revOf, resolveBids, attack, settle, owned, worth, finalScore, clamp, rnd, CATS };
 })();

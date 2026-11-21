@@ -20,6 +20,8 @@ const pick = a => a[Math.floor(R() * a.length)];
   const r = E.attack(t, 3, rng); const e = r.ev.find(x => x.k === 'chat'); assert.ok(e.hit); assert.ok(Math.abs(e.p - E.oddsOf('chat', 3, t.nodes.chat) * .8) < 1e-9); assert.ok(t.players.b.trust < 5 + 1 && r.tl.b === 1);
   // determinism of rng-free parts: no hits with rng=0.999
   const u = { round: 2, players: { a: { cash: 50, trust: 5 } }, nodes: { chat: { by: 'a', c: 0 } }, bids: {}, pacts: [] }; E.attack(u, 2, () => .9999); assert.strictEqual(u.players.a.cash, 50);
+  const f1 = { c: 1, k: ['tst'], scanned: true }, f2 = { c: 1, k: ['mon'], scanned: true };
+  assert.ok(E.hasFit('chat', f1) && !E.hasFit('chat', f2)); assert.ok(Math.abs(E.oddsOf('chat', 2, f1) / E.oddsOf('chat', 2, f2) - E.FIT_ODDS) < 1e-9);
   console.log('unit tests ok');
 })();
 // --- randomised full games, invariants
