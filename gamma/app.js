@@ -164,7 +164,7 @@
     if (id === 'S_EMAIL') { add('PE', q1.PE); add('LPE', q2.LPE); } if (id === 'S_AUDIT') { add('AU', q1.AU); add('GO', q1.GO ? 1 : 0); add('LGO', q2.LGO); add('LAU', q2.LAU); }
     if (h.ind) mine.unshift('IND');
     const cls = h.v <= 0 ? 'safe' : lvl >= 1 ? 'half' : 'hit';
-    const txt = h.ind ? `📜 Your Indemnity policy paid this one (−${h.raw} covered). <b>Trust damage still counts</b>`
+    const txt = h.ind ? `📜 Your Indemnity policy paid this one (covers up to ${G.IND_CAP}: −${Math.min(h.raw, G.IND_CAP)} paid). <b>Trust damage still counts</b>`
       : h.v <= 0 ? `Your cards stopped it. <b>Blocked</b>`
       : h.untested ? `Your ${lvl >= 2 ? 'cards' : 'card'} only worked at 75%: never tested (no Red team · AI Act Art. 9). <b>−${h.v}</b>`
       : lvl === 1 ? `Your card caught part of it. Halved: <b>−${h.v}</b>` : `Nothing stopped it (${esc(ctrl)}). Full hit: <b>−${h.v}</b>`;
@@ -261,13 +261,13 @@
           worth > 0 ? `It paid off for you: your hits were only ${pre} before Payments` : worth < 0 ? `It cost you: your hits were ${pre} before Payments, so the extra damage beat the extra money` : `It broke even: your hits were ${pre} before Payments`); }
       else if (k === 'MKT') lines.push(`+${15 * n} revenue`);
       else if (k === 'LOAN') lines.push(`+${30 * n} revenue`, on.includes('FAIR') ? 'and made the fairness fine bigger' : 'the fairness fine it risks never came');
-      else if (k === 'GO') lines.push(r.neg ? 'Boost skipped: money minus damage was below zero' : 'Whole score ×1.5');
-      else if (k === 'LGO') lines.push(q1.GO ? 'No extra multiplier: your Named owner already gave ×1.5' : r.neg ? 'Boost skipped: money minus damage was below zero' : 'Whole score ×1.25');
+      else if (k === 'GO') lines.push(r.neg ? 'Boost skipped: money minus damage was below zero' : 'Whole score ×1.15');
+      else if (k === 'LGO') lines.push(q1.GO ? 'No extra multiplier: your Named owner already gave ×1.25' : r.neg ? 'Boost skipped: money minus damage was below zero' : 'Whole score ×1.25');
       else if (k === 'VM') lines.push(r.neg ? 'Trust damage was skipped (score below zero), so nothing to cut' : `Cut trust damage by ${n >= 2 ? 65 : 50}%`);
       else if (k === 'LRM') lines.push(r.neg ? 'Trust damage was skipped (score below zero), so nothing to cut' : 'Cut trust damage by 25%');
       else if (k === 'SA') lines.push('Made every Day 6 hit 25% smaller');
       else if (k === 'LT') lines.push(`+${r.lit} literacy points (1 per card you own)`);
-      else if (k === 'IND') { const h = r.hits.find(x => x.ind); lines.push(h ? `Paid your biggest hit: ${nm(h.id)} (${h.raw})` : 'Nothing big enough got through to claim'); }
+      else if (k === 'IND') { const h = r.hits.find(x => x.ind); lines.push(h ? `Paid up to ${G.IND_CAP} of your biggest hit: ${nm(h.id)} (${Math.min(h.raw, G.IND_CAP)})` : 'Nothing big enough got through to claim'); }
       if (k === 'HU') lines.push(`−${5 * n} revenue (humans are slower)`);
       if (k === 'RT' && G.RTS.some(id => on.includes(id) && G.shield(id, q1, q2) > 0)) lines.push('Tested your other controls, so they worked at 100%');
       covers(k).forEach(id => { if (!on.includes(id)) { lines.push(`${nm(id)} never came`); return; }
@@ -295,20 +295,20 @@
         if (q1.PAY) { v *= 1 + 0.25 * q1.PAY; st.push(`Payments made it ${25 * q1.PAY}% bigger → <b>${f1(v)}</b>`); }
         if (h.id === 'FAIR' && q2.LOAN) { v *= 1 + 0.5 * q2.LOAN; st.push(`Loans made it ${50 * q2.LOAN}% bigger → <b>${f1(v)}</b>`); }
         if (h.part === 2 && has && q2.SA) { v *= 0.75; st.push(`Seeded test made it 25% smaller → <b>${f1(v)}</b>`); }
-        if (h.ind) st.push(`your Indemnity policy paid it → <b>0</b>`); }
+        if (h.ind) st.push(`your Indemnity policy paid up to ${G.IND_CAP} → <b>${h.v}</b>`); }
       return `<div class="vrow"><span>${nm(h.id)}</span><b>${h.v ? '−' + h.v : '0'}</b></div><div class="vchain">${st.join(' → ')}</div>`; };
     const keep = Math.round(100 / r.trust), rp = Math.round((1 - (r.trust - 1) / (0.2 * Math.max(1, r.n))) * 100);
-    const rev1d = [`50 to start`].concat(q1.PAY ? [`+ ${30 * q1.PAY} Payments`] : [], q1.MKT ? [`+ ${15 * q1.MKT} Marketing`] : [], q1.HU ? [`− ${5 * q1.HU} Human check`] : []).join(' ');
+    const rev1d = [`70 to start`].concat(q1.PAY ? [`+ ${30 * q1.PAY} Payments`] : [], q1.MKT ? [`+ ${15 * q1.MKT} Marketing`] : [], q1.HU ? [`− ${5 * q1.HU} Human check`] : []).join(' ');
     const rev2d = has ? [`50 to start`].concat(q2.LOAN ? [`+ ${30 * q2.LOAN} Loans`] : []).join(' ') : '';
     const V = (cls, ico, name, val, body) => `<div class="vbox ${cls}"><div class="vhd"><span>${ico} ${name}</span><b>${val}</b></div>${body}</div>`;
     const boxes =
-      V('c1', '💰', 'Money you made', r.rev, `<p>Every company starts with 50 in each part. Some cards add money, some take a little away.</p>
+      V('c1', '💰', 'Money you made', r.rev, `<p>Every company starts with 70 in each part. Some cards add money, some take a little away.</p>
         <div class="vrow"><span>Part 1: ${rev1d}</span><b>${r.rev1}</b></div>${has ? `<div class="vrow"><span>Part 2: ${rev2d}</span><b>${r.rev - r.rev1}</b></div>` : '<p>You didn’t play Part 2, so no money from it.</p>'}`)
       + V('c2', '💥', 'Damage from attacks', '−' + r.pen, `<p>${on.length} attacks happened. Each one starts with a damage number. Your cards make it smaller, Payments make it bigger.</p>${r.hits.map(chain).join('')}`)
       + V('c3', '🚫', 'Overspend fine', r.bust ? '−' + r.bust : '0', r.bust ? `<p>You spent more than the budget${r.bust1 ? ' in Part 1 (limit 100)' : ''}${r.bust - (r.bust1 || 0) ? ' in Part 2 (limit 80)' : ''}, counting IOUs. Going over costs a flat 50.</p>` : '<p>You stayed within budget, so no fine.</p>')
       + (r.neg ? V('c4', '📋', 'Owner boost', 'skipped', `<p>${r.govSet > 1 ? `You bought an owner card, but money minus damage was <b>below zero</b>.` : 'Nobody owned the AI, and money minus damage was below zero anyway.'} A boost only multiplies a positive score, so it was skipped.</p>`) : '')
-      + (r.neg ? '' : V('c4', '📋', 'Owner boost', '×' + r.gov, r.gov === 1.5 ? '<p>You bought a <b>Named owner</b>, so someone is accountable for the AI. Your total is multiplied by 1.5 (one and a half times).</p>'
-          : r.gov === 1.25 ? '<p>You bought a <b>Late owner</b> in Part 2. Your total is multiplied by 1.25.</p>' : '<p>Nobody owned the AI, so no boost (×1 means it stays the same).</p>'))
+      + (r.neg ? '' : V('c4', '📋', 'Owner boost', '×' + r.gov, r.gov === 1.25 ? '<p>You bought a <b>Named owner</b>, so someone is accountable for the AI. Your total is multiplied by 1.25.</p>'
+          : r.gov === 1.15 ? '<p>You bought a <b>Late owner</b> in Part 2. Your total is multiplied by 1.15.</p>' : '<p>Nobody owned the AI, so no boost (×1 means it stays the same).</p>'))
       + (q2.LT && has ? V('c5', '🎓', 'Literacy bonus', '+' + r.lit, `<p>Your AI literacy card gives ${q2.LT} point${q2.LT > 1 ? 's' : ''} for every card you own. You own ${ncards} cards → <b>${r.lit}</b>.</p>`) : '')
       + (r.neg ? V('c6', '🤝', 'Trust damage', 'skipped', `<div class="hearts">${'💔'.repeat(r.n)}<span>${r.n} attack${r.n > 1 ? 's' : ''} got through</span></div><p>Trust damage takes away a <b>share</b> of a positive score. Your money minus damage was already below zero, so there was nothing left to take a share of. It was skipped.</p>`) : '')
       + (r.neg ? '' : (() => { const t3b = (r.rev - r.pen - r.bust) * r.gov + r.lit, aft = Math.round(t3b / r.trust), lost = Math.round((1 - 1 / r.trust) * 100),
@@ -353,7 +353,7 @@
     const extra = { PAY: 'Raises every hit you take by 25% per card', LOAN: 'Raises the fairness fine per card', RT: 'Also tests your other controls, so they work at 100%', VM: 'Cuts trust damage after every hit', SA: 'Makes every Day 6 hit 25% smaller', LRM: 'Cuts trust damage a little more', GO: 'Your whole score ×1.5', LGO: 'Score ×1.25 if you had no owner', LT: '+1 point for every card you own', }[k];
     const weak = stops.some(id => G.RTS.includes(id)) && k !== 'RT';
     if (k === 'IND') return `<div class="cb-k">${kind} · ${cost} CHIPS</div><div class="cb-t">${e} ${esc(n)}</div>
-      <div class="cb-c"><b>WHAT IT DOES</b><p class="cb-p">At the next reveal, your <u>single biggest hit</u> costs you <b>0 points</b>. Insurance pays it for you.</p></div>
+      <div class="cb-c"><b>WHAT IT DOES</b><p class="cb-p">At the next reveal, insurance pays <b>up to 30 points</b> of your <u>single biggest hit</u>.</p></div>
       <div class="cb-c"><b>HOW TO UNLOCK</b><p class="cb-p">Own <b>🔑 Least privilege</b> and <b>🔌 Kill switch</b>. Insurers only cover agents with basic controls.</p></div>
       <div class="cb-c"><b>GOOD TO KNOW</b><p class="cb-p">• One per game<br>• Covers the next reveal: Day 1 or Day 6<br>• Your reputation still takes the hit (trust damage)</p></div>`;
     return `<div class="cb-k">${kind} · ${cost} CHIPS</div><div class="cb-t">${e} ${esc(n)}</div>

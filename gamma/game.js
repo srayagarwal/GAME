@@ -1,6 +1,6 @@
 /* Agent Tycoon · rules and scoring (same maths as the v4 Google Sheet) */
 (function (root) {
-  const BUDGET1 = 100, BUDGET2 = 80, TOTAL = 180, LIT_PER_CARD = 1, SA_FACTOR = 0.75, TRUST_PER_HIT = 0.2, REM_MAX = 0.65, BUST = 50;
+  const BUDGET1 = 100, BUDGET2 = 80, TOTAL = 180, LIT_PER_CARD = 1, SA_FACTOR = 0.75, TRUST_PER_HIT = 0.2, REM_MAX = 0.65, BUST = 50, IND_CAP = 30;
   // id, emoji, name, short effect, cost, suit (r revenue · b control · f one-off fix), max copies, what 1/2/3 copies do
   const P1 = [
     ['PAY', '💰', 'Payments', '+30 revenue · raises risk', 10, 'r', 3, ['+30 revenue, every hit +25%', '+60 revenue, every hit +50%', '+90 revenue, every hit +75%']],
@@ -9,24 +9,24 @@
     ['RT', '🎯', 'Red team', 'stops jailbreaks', 10, 'b', 3, ['Halves a jailbreak', 'Blocks it completely', 'No extra effect']],
     ['KS', '🔌', 'Kill switch', 'stops runaway loops', 10, 'b', 3, ['Halves a runaway loop', 'Blocks it completely', 'No extra effect']],
     ['LP', '🔑', 'Least privilege', 'stops data leaks', 10, 'b', 3, ['Halves a data leak', 'Blocks it completely', 'No extra effect']],
-    ['GO', '📋', 'Named owner', 'score ×1.5', 20, 'b', 3, ['Whole score ×1.5, helps with audits', 'No extra effect', 'No extra effect']],
+    ['GO', '📋', 'Named owner', 'score ×1.25', 20, 'b', 3, ['Whole score ×1.25, helps with audits', 'No extra effect', 'No extra effect']],
     ['AU', '🧾', 'Audit trail', 'evidence for regulators', 10, 'b', 3, ['Halves an audit hit', 'Blocks it completely', 'No extra effect']],
     ['HU', '👤', 'Human check', 'stops big payments', 10, 'b', 3, ['Halves a wrong payment, −5 revenue', 'Blocks it, −10 revenue', 'No extra effect, −15 revenue']],
     ['VM', '🩺', 'Vuln. mgmt', 'cuts trust damage', 10, 'b', 3, ['Scanning: trust damage −50%', 'Scanning + remediation: −65%', 'No extra effect']],
-    ['IND', '📜', 'Indemnity policy', 'wild card', 20, 'w', 1, ['Pays your biggest hit at the next reveal (Day 1 if bought in Part 1, Day 6 if bought in Part 2)']],
+    ['IND', '📜', 'Indemnity policy', 'wild card', 30, 'w', 1, ['Pays up to 30 of your biggest hit at the next reveal (Day 1 if bought in Part 1, Day 6 if bought in Part 2)']],
   ];
   const P2 = [
-    ['LOAN', '🏦', 'Loans', '+30 revenue', 10, 'r', 3, ['+30 revenue, fairness fine +50%', '+60 revenue, fairness fine +100%', '+90 revenue, fairness fine +150%']],
+    ['LOAN', '🏦', 'Loans', '+30 revenue', 10, 'r', 2, ['+30 revenue, fairness fine +50%', '+60 revenue, fairness fine +100%']],
     ['FT', '⚖️', 'Fairness tests', 'stops fairness fines', 10, 'b', 3, ['Halves a fairness fine', 'Blocks it completely', 'No extra effect']],
     ['GC', '📚', 'Grounding', 'stops invented policy', 10, 'b', 3, ['Halves an invented policy', 'Blocks it completely', 'No extra effect']],
     ['DM', '📈', 'Drift monitor', 'catches silent drift', 10, 'b', 3, ['Halves silent drift', 'Blocks it completely', 'No extra effect']],
     ['LT', '🎓', 'AI literacy', '+1 per card you own', 10, 'b', 3, ['+1 per card you own, halves a deepfake', '+2 per card, blocks deepfakes', '+3 per card']],
     ['SA', '🧪', 'Seeded test', 'Day 6 hits −25%', 10, 'f', 2, ['Every Day 6 hit 25% smaller', 'No extra effect']],
     ['LPE', '🩹', 'Late policy', 'blocks the planted email', 30, 'f', 2, ['Blocks the planted email', 'No extra effect']],
-    ['LGO', '🩹', 'Late owner', 'score ×1.25', 20, 'f', 2, ['×1.25 if you had no owner, helps audits', 'No extra effect']],
+    ['LGO', '🩹', 'Late owner', 'score ×1.15', 20, 'f', 2, ['×1.15 if you had no owner, helps audits', 'No extra effect']],
     ['LAU', '🩹', 'Late audit', 'blocks the audit', 20, 'f', 2, ['Blocks the regulator audit', 'No extra effect']],
     ['LRM', '🩹', 'Late remediation', 'cuts trust damage', 20, 'f', 2, ['Trust damage −25% more (max −65%)', 'No extra effect']],
-    ['IND', '📜', 'Indemnity policy', 'wild card', 20, 'w', 1, ['Pays your biggest hit at the next reveal (Day 1 if bought in Part 1, Day 6 if bought in Part 2)']],
+    ['IND', '📜', 'Indemnity policy', 'wild card', 30, 'w', 1, ['Pays up to 30 of your biggest hit at the next reveal (Day 1 if bought in Part 1, Day 6 if bought in Part 2)']],
   ];
   // id, emoji, name, part, penalty, what stops it, story
   const INCIDENTS = [
@@ -73,7 +73,7 @@
   function score(player, on, final) {
     const q1 = full(player.q1, P1), q2 = full(player.q2, P2), has2 = !!player.has2;
     const s1 = player.s1 != null ? player.s1 : spent(q1, P1), s2 = has2 ? (player.s2 != null ? player.s2 : spent(q2, P2)) : 0;
-    const rev1 = 50 + 30 * q1.PAY + 15 * q1.MKT - 5 * q1.HU, rev2 = has2 ? 50 + 30 * q2.LOAN : 0;
+    const rev1 = 70 + 30 * q1.PAY + 15 * q1.MKT - 5 * q1.HU, rev2 = has2 ? 70 + 30 * q2.LOAN : 0;
     const bust1 = s1 > BUDGET1 ? BUST : 0, bust2 = has2 && s2 > BUDGET2 ? BUST : 0;
     let pen1 = 0, pen2 = 0, u1 = 0, u2 = 0; const hits = [];
     INCIDENTS.forEach(([id, , , part]) => {
@@ -84,18 +84,18 @@
     });
     // wild card: Indemnity policy pays the biggest hit of the reveal that follows its purchase (trust damage still counts)
     [1, 2].forEach(part => { if (!(part === 1 ? q1.IND : q2.IND)) return; const hs = hits.filter(h => h.part === part && h.v > 0); if (!hs.length) return;
-      const big = hs.reduce((a, b) => (b.v > a.v ? b : a)); big.ind = true; big.v = 0; });
+      const big = hs.reduce((a, b) => (b.v > a.v ? b : a)); big.ind = true; big.v = Math.max(0, big.v - IND_CAP); });
     hits.forEach(h => { if (h.v > 0 || h.ind) { if (h.part === 1) { pen1 += h.v; u1++; } else { pen2 += h.v; u2++; } } });
     // EU AI Act: every incident that got through breaks its article; untested controls break Art. 9
     const arts = []; hits.forEach(h => { if (h.raw > 0) { const a = ACT[h.id][0]; if (arts.indexOf(a) < 0) arts.push(a); } if (h.untested && arts.indexOf('9') < 0) arts.push('9'); });
     arts.sort((a, b) => a - b);
     // whistleblower (Part 2 surprise): report = +10, hide = 50% chance of −60 on Day 6
     const wb = final && player.wb ? (player.wb.choice === 'report' ? 10 : (player.wb.leak ? -60 : 0)) : 0;
-    const gov1 = q1.GO ? 1.5 : 1;
+    const gov1 = q1.GO ? 1.25 : 1;
     // below-zero rule: if money minus damage is already negative, the owner boost and trust damage are skipped (they only scale a positive score)
     const base1 = rev1 - pen1 - bust1, neg1 = base1 < 0, trust1raw = 1 + TRUST_PER_HIT * u1 * (1 - rem(q1, {}));
     const mid = neg1 ? Math.round(base1) : Math.round(base1 * gov1 / trust1raw);
-    const gov = q1.GO ? 1.5 : (q2.LGO ? 1.25 : 1);
+    const gov = q1.GO ? 1.25 : (q2.LGO ? 1.15 : 1);
     const cards = player.cards != null ? player.cards : Object.values(q1).reduce((a, b) => a + b, 0) + Object.values(q2).reduce((a, b) => a + b, 0);
     const lit = LIT_PER_CARD * cards * (q2.LT || 0);
     const r = rem(q1, q2), trust = 1 + TRUST_PER_HIT * (u1 + u2) * (1 - r);
@@ -125,6 +125,6 @@
     DRIFT: ['Model vendor pushes surprise update to banks', 'Users report AI answers quietly getting worse after an overnight update.'],
     DEEP: ['CEO voice-clone scam hits a European bank', 'Staff transferred funds after a convincing deepfake call from “the CEO”.'] };
   function makeNews(part, rnd) { rnd = rnd || Math.random; const pool = POOL[part]; return [{ id: pool[Math.floor(rnd() * pool.length)], real: rnd() < 0.5 }]; }
-  const api = { BUDGET1, BUDGET2, TOTAL, P1, P2, INCIDENTS, INC, CARD, CTRL, ACT, NEWS, POOL, UNTESTED, RTS, weak, score, pick, makeNews, shield, spent, full, hitOf, tested };
+  const api = { IND_CAP, BUDGET1, BUDGET2, TOTAL, P1, P2, INCIDENTS, INC, CARD, CTRL, ACT, NEWS, POOL, UNTESTED, RTS, weak, score, pick, makeNews, shield, spent, full, hitOf, tested };
   if (typeof module !== 'undefined') module.exports = api; else root.TYCOON = api;
 })(this);
