@@ -214,9 +214,9 @@
       // 0 · budget released for this quarter, plus a bonus when last quarter went well
       add('💶 Quarter ' + (q + 1) + ' budget released', BUDGET[q] != null ? BUDGET[q] : 30, 'bud');
       if (q > 0) { const pq = out.quarters[q - 1], ids = prods.filter(id => P[id].l != null && P[id].l < q && ALLP[id].tier !== 'prohibited');
-        if (q === 1 && pq.trustAfter >= 4 && !pq.hits.some(v => v.kind === 'hit')) add('🎁 Bonus: Q1 ended with 4+ ⭐ and no incident', 20, 'bonus');
+        if (q === 1 && pq.trustAfter >= 4 && !pq.hits.some(v => v.kind === 'hit') && prods.some(id => ALLP[id].tier !== 'prohibited' && P[id].a === 0) && !prods.some(id => ALLP[id].tier === 'prohibited' && P[id].s != null)) add('🎁 Bonus: Q1 assessed a product, kept 4+ ⭐ and had no incident', 20, 'bonus');
         if (q === 2 && ids.length && ids.every(id => P[id].a != null && P[id].a <= P[id].l && Object.keys(P[id].c).length) && !prods.some(id => ALLP[id].tier === 'prohibited' && P[id].l != null)) add('🎁 Bonus: every launch was assessed first and has controls', 25, 'bonus');
-        if (q === 3 && pq.trustAfter >= 4 && has(fnd, 'IRP', q) && has(fnd, 'INV', q)) add('🎁 Bonus: 4+ ⭐ held, with an incident plan and AI inventory', 30, 'bonus'); }
+        if (q === 3 && pq.trustAfter >= 4 && ids.length && has(fnd, 'IRP', q) && has(fnd, 'INV', q)) add('🎁 Bonus: 4+ ⭐ held, with an incident plan and AI inventory', 30, 'bonus'); }
       // 1 · income from products live before this quarter
       if (q > 0) prods.forEach(id => { const p = P[id]; if (live(p, q - 1) && !(p.x != null && p.x <= q - 1)) { let r = ALLP[id].earn * MULT(trust); if (has(p.c, 'HITL', q - 1)) r *= 0.9; r = Math.round(r * 10) / 10; if (r) add(ALLP[id].i + ' ' + ALLP[id].n + ' earned (' + Math.round(MULT(trust) * 100) + '% at ' + trust + ' ⭐' + (has(p.c, 'HITL', q - 1) ? ', −10% human review' : '') + ')', r, 'inc'); } });
       // 2 · planning spend
