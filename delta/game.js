@@ -5,7 +5,7 @@
 
   // ---------- rules ----------
   const MULT = t => Math.round((0.4 + 0.12 * t) * 100) / 100;
-  const START = 100, PEOPLE = 3, ASSESS = { m: 5, p: 1 }, DISCLOSE = 10, BANFINE = 60;
+  const BUDGET = [30, 45, 30, 45], START = BUDGET[0], PEOPLE = 3, ASSESS = { m: 5, p: 1 }, DISCLOSE = 10, BANFINE = 60;
   const SEV = { minor: { n: 'Minor', dmg: 15 }, major: { n: 'Major', dmg: 30 }, critical: { n: 'Critical', dmg: 45 } };
   const TIER = { prohibited: '🚫 Prohibited', high: '⚠️ High risk', limited: 'ℹ️ Limited risk', minimal: '✅ Minimal risk' };
 
@@ -198,7 +198,7 @@
 
   function score(state, pid, pl) {
     pl = pl || {}; const seed = state.seed, Q = state.len || 6, prods = state.products || [], fnd = pl.f || {}, my = pl.p || {}, resp = pl.r || {};
-    let cash = START, trust = 5, insUsed = false;
+    let cash = 0, trust = 5, insUsed = false;
     const out = { quarters: [], prod: {}, hits: 0, disclosed: 0, quiet: 0, pulled: 0, leaks: 0, banned: 0, m: {} };
     const P = {}; prods.forEach(id => { const x = my[id] || {}; P[id] = { id, risks: risksOf(seed, id), s: x.s, a: x.a, l: x.l, x: x.x, c: x.c || {}, closedBy: {}, fined: false }; });
     const live = (p, q) => p.l != null && p.l <= q && !(p.x != null && p.x < q);
@@ -211,6 +211,12 @@
       const st = stageOf(state, q); if (st < 0) break;
       const R = { q, lines: [], hits: [], reg: null, peopleUsed: 0, trustBefore: trust, notes: [] };
       const add = (t, v, k) => { v = Math.round(v * 10) / 10; if (v) R.lines.push({ t, v, k }); cash = Math.round((cash + v) * 10) / 10; };
+      // 0 · budget released for this quarter, plus a bonus when last quarter went well
+      add('💶 Quarter ' + (q + 1) + ' budget released', BUDGET[q] != null ? BUDGET[q] : 30, 'bud');
+      if (q > 0) { const pq = out.quarters[q - 1], ids = prods.filter(id => P[id].l != null && P[id].l < q && ALLP[id].tier !== 'prohibited');
+        if (q === 1 && pq.trustAfter >= 4 && !pq.hits.some(v => v.kind === 'hit')) add('🎁 Bonus: Q1 ended with 4+ ⭐ and no incident', 20, 'bonus');
+        if (q === 2 && ids.length && ids.every(id => P[id].a != null && P[id].a <= P[id].l && Object.keys(P[id].c).length) && !prods.some(id => ALLP[id].tier === 'prohibited' && P[id].l != null)) add('🎁 Bonus: every launch was assessed first and has controls', 25, 'bonus');
+        if (q === 3 && pq.trustAfter >= 4 && has(fnd, 'IRP', q) && has(fnd, 'INV', q)) add('🎁 Bonus: 4+ ⭐ held, with an incident plan and AI inventory', 30, 'bonus'); }
       // 1 · income from products live before this quarter
       if (q > 0) prods.forEach(id => { const p = P[id]; if (live(p, q - 1) && !(p.x != null && p.x <= q - 1)) { let r = ALLP[id].earn * MULT(trust); if (has(p.c, 'HITL', q - 1)) r *= 0.9; r = Math.round(r * 10) / 10; if (r) add(ALLP[id].i + ' ' + ALLP[id].n + ' earned (' + Math.round(MULT(trust) * 100) + '% at ' + trust + ' ⭐' + (has(p.c, 'HITL', q - 1) ? ', −10% human review' : '') + ')', r, 'inc'); } });
       // 2 · planning spend
@@ -318,7 +324,7 @@
     return { inc, reg };
   }
 
-  const api = { MULT, hash, shuffle, START, PEOPLE, ASSESS, DISCLOSE, BANFINE, SEV, TIER, W, WAREA, AREAS, C, FIXOF, F, N, EV, SECTORS, SKEYS, ALLP,
+  const api = { MULT, hash, shuffle, START, BUDGET, PEOPLE, ASSESS, DISCLOSE, BANFINE, SEV, TIER, W, WAREA, AREAS, C, FIXOF, F, N, EV, SECTORS, SKEYS, ALLP,
     productsFor, risksOf, stageOf, score, planInfo, drawEvents, has };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.DeltaGame = api;
 })(typeof window !== 'undefined' ? window : globalThis);

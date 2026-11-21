@@ -65,7 +65,7 @@
   function rules() {
     return `<div class="rules">
       <div class="ru"><span>🏢</span><div>You run AI at <b>${esc(sector().org)}</b>. Over <b>${len()} quarters</b> you decide which AI products to build, how to control them, and what governance to put in place.</div></div>
-      <div class="ru"><span>💶</span><div>You start with <b>€${G.START}k for the whole game</b>, and <b>${G.PEOPLE} people each quarter</b>. Live products earn money every quarter. Lose trust ⭐ and they earn less.</div></div>
+      <div class="ru"><span>💶</span><div>Money is released each quarter: <b>€${G.BUDGET.join('k → €')}k</b>, plus bonuses (+€20k, +€25k, +€30k) when the previous quarter went well. You get <b>${G.PEOPLE} people each quarter</b>. Live products earn money every quarter. Lose trust ⭐ and they earn less.</div></div>
       <div class="ru"><span>🎴</span><div>Every product hides <b>3 risks</b>. Assess it to see them. Add <b>controls</b> to a product, or build <b>foundations</b> that protect everything. You can’t afford them all.</div></div>
       <div class="ru"><span>📰</span><div>Each quarter a <b>real AI incident</b> hits every live product with that risk, unless a control stops it. From ${ql(1)}, <b>regulators, journalists and the board</b> check on you too.</div></div>
       <div class="ru"><span>🏆</span><div>Final score = cash + the value of your live products. You also get a <b>Responsible AI report</b> on how you played.</div></div></div>`;
