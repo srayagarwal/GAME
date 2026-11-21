@@ -7,4 +7,6 @@
 Host picks the sector pack (banking, insurance, health, energy, telecom) and client name in the lobby, then steps through the game with one button.
 4 rounds · flip → bid → build → deals → attack → settle. Only the Attack phase uses chance.
 Score = (cash + system values + controls) × (0.6 + 0.08 × Trust).
-v1 limits: only shared-liability pacts are implemented; numbers are untested placeholders pending human playtests.
+Deals: shared-liability pacts, control licences, pipeline co-ownership. News cards (one real, one fake) from round 2. Cash never goes below 0: an unpaid shortfall costs Trust.
+Tests: `node test/engine.test.js` (unit + 4,000 random games).
+Numbers are simulation-tuned but not yet human-playtested.
