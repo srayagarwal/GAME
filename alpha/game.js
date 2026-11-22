@@ -84,6 +84,10 @@
   };
   const leaves = node => typeof node === 'string' ? [node] : node.k.reduce((a, x) => a.concat(leaves(x)), []);
   const OF = d => TREE[d].reduce((a, n) => a.concat(leaves(n)), []);
+  // groups (branch, area, sub-area) with stable keys safe for Firebase; GOF[id] lists the groups holding a control, largest first
+  const GROUPS = {}, GOF = {};
+  const regG = (key, ids) => { if (ids.length < 2) return; GROUPS[key] = ids; ids.forEach(id => (GOF[id] = GOF[id] || []).push(key)); };
+  Object.keys(TREE).forEach(d => { const k0 = d.replace(/[^A-Za-z0-9]/g, ''); regG(k0, OF(d)); const walk = (n, k) => { if (typeof n === 'string') return; regG(k, leaves(n)); n.k.forEach((c, i) => walk(c, k + '_' + i)); }; TREE[d].forEach((n, i) => walk(n, k0 + '_' + i)); });
   // sanity: the tree and the catalogue must agree
   IDS.forEach(id => { if (OF(CT[id].d).indexOf(id) < 0) throw new Error('control not in tree: ' + id); });
   // cross-links on the mind map: owning both ends earns "Linked pair"
@@ -159,10 +163,15 @@
   function bundleIds(G, p, ids) { ids = ids.filter(id => isOpen(id, G) && (p.own || {})[id] == null); if (ids.length < 2) return null; return { ids, cost: half(ids.reduce((s, id) => s + price(G, p, id), 0) * BUNDLE) }; }
   const bundle = (G, p, x) => bundleIds(G, p, typeof x === 'string' ? OF(x) : x);
   function canBuy(G, p, id) { if (!CT[id] || !isOpen(id, G)) return 'closed'; const c = price(G, p, id); if (c == null) return 'max'; if (p.budget < c) return 'cash'; return ''; }
-  function buy(G, p, id) { const e = canBuy(G, p, id); if (e) return e; const c = price(G, p, id); p.budget = rnd(p.budget - c); p.own = p.own || {}; p.bought = p.bought || {}; const l = p.own[id]; p.own[id] = l == null ? 0 : l + 1; if (l == null) p.bought[id] = G.round; p.spent = rnd((p.spent || 0) + c); p.paid = p.paid || {}; (p.paid[id] = p.paid[id] || []).push(c); return ''; }
+  function buy(G, p, id) { const e = canBuy(G, p, id); if (e) return e; const c = price(G, p, id); p.budget = rnd(p.budget - c); p.own = p.own || {}; p.bought = p.bought || {}; const l = p.own[id]; p.own[id] = l == null ? 0 : l + 1; if (l == null) p.bought[id] = G.round; p.spent = rnd((p.spent || 0) + c); p.paid = p.paid || {}; (p.paid[id] = p.paid[id] || []).push(c); if (l == null) settle(p, id); return ''; }
+  // completing a whole group within one round (no bundle used) earns the bundle discount back automatically
+  function settle(p, id) { p.reb = p.reb || {}; p.bdl = p.bdl || {}; const mine = k => p.reb[k] != null;
+    for (const key of GOF[id] || []) { if (mine(key)) continue; const ids = GROUPS[key]; if (!ids.every(i => (p.own || {})[i] != null && p.paid[i] && p.paid[i].length && !p.bdl[i])) continue;
+      const sum = ids.reduce((x, i) => x + p.paid[i][0], 0); let amt = rnd(sum * (1 - BUNDLE)); Object.keys(p.reb).forEach(k => { if (GROUPS[k] && GROUPS[k].every(i => ids.indexOf(i) >= 0)) amt = rnd(amt - p.reb[k]); });
+      if (amt > 0) { p.reb[key] = amt; p.budget = rnd(p.budget + amt); p.spent = rnd((p.spent || 0) - amt); } return; } }
   const canUndo = (p, id) => !!(p.paid && p.paid[id] && p.paid[id].length && (p.own || {})[id] != null);
-  function undo(G, p, id) { if (!canUndo(p, id)) return 'frozen'; const c = p.paid[id].pop(); if (!p.paid[id].length) delete p.paid[id]; p.budget = rnd(p.budget + c); p.spent = rnd((p.spent || 0) - c); if (p.own[id] === 0) { delete p.own[id]; if (p.bought) delete p.bought[id]; } else p.own[id]--; return ''; }
-  function buyBundle(G, p, x) { const b = bundle(G, p, x); if (!b) return 'none'; if (p.budget < b.cost) return 'cash'; p.budget = rnd(p.budget - b.cost); p.spent = rnd((p.spent || 0) + b.cost); p.own = p.own || {}; p.bought = p.bought || {}; p.paid = p.paid || {}; const raw = b.ids.map(id => price(G, p, id)), tot = raw.reduce((x, y) => x + y, 0); let left = b.cost; b.ids.forEach((id, i) => { const sh = i === b.ids.length - 1 ? rnd(left) : rnd(b.cost * raw[i] / tot); left -= sh; (p.paid[id] = p.paid[id] || []).push(sh); p.own[id] = 0; p.bought[id] = G.round; }); return ''; }
+  function undo(G, p, id) { if (!canUndo(p, id)) return 'frozen'; let claw = 0; if (p.own[id] === 0 && p.reb) (GOF[id] || []).forEach(k => { claw += p.reb[k] || 0; }); if (claw && p.budget + p.paid[id][p.paid[id].length - 1] - claw < 0) return 'cash'; if (claw) { (GOF[id] || []).forEach(k => { delete p.reb[k]; }); p.budget = rnd(p.budget - claw); p.spent = rnd((p.spent || 0) + claw); } const c = p.paid[id].pop(); if (!p.paid[id].length) delete p.paid[id]; p.budget = rnd(p.budget + c); p.spent = rnd((p.spent || 0) - c); if (p.own[id] === 0) { delete p.own[id]; if (p.bought) delete p.bought[id]; } else p.own[id]--; return ''; }
+  function buyBundle(G, p, x) { const b = bundle(G, p, x); if (!b) return 'none'; if (p.budget < b.cost) return 'cash'; p.budget = rnd(p.budget - b.cost); p.spent = rnd((p.spent || 0) + b.cost); p.own = p.own || {}; p.bought = p.bought || {}; p.paid = p.paid || {}; const raw = b.ids.map(id => price(G, p, id)), tot = raw.reduce((x, y) => x + y, 0); let left = b.cost; b.ids.forEach((id, i) => { const sh = i === b.ids.length - 1 ? rnd(left) : rnd(b.cost * raw[i] / tot); left -= sh; (p.paid[id] = p.paid[id] || []).push(sh); p.own[id] = 0; p.bought[id] = G.round; (p.bdl = p.bdl || {})[id] = 1; }); return ''; }
   const value = p => rnd(Object.keys(p.own || {}).reduce((s, id) => { let v = CT[id].c; for (let i = 0; i < p.own[id]; i++) v += up(id); return s + v; }, 0));
 
   /* ---------- attacks ---------- */
@@ -229,6 +238,6 @@
     const topGapD = gaps.length ? CT[gaps[0].id].d : weak.d;
     return { gaps, cov, weak: weak.d, strong: strong.d, dmg: rnd(p.dmg || 0), saved: rnd(p.saved || 0), credit: rnd(p.credit || 0), score: score(p), value: value(p), left: p.budget, advice: advice[topGapD], advD: topGapD, byRound: p.byRound || [] }; }
 
-  root.ALPHA = { DISC, TREE, leaves, bundleIds, DSHORT, DCOL, LV, ABS, CAP, C: CT, IDS, OF, LINKS, A, AIDS, REGN, USE, SECTORS, DEFAULT_UC, ROUNDS, START, TOPUP, BASE_EQ, BON, BIDS, rnd, half, rng, isOpen, price, up, bundle, canBuy, buy, buyBundle, undo, canUndo, value, absorb, exposed, baseDmg, draw, strike, drawBonus, applyBonus, awardsRound, finalAwards, score, report, advice };
+  root.ALPHA = { GROUPS, GOF, DISC, TREE, leaves, bundleIds, DSHORT, DCOL, LV, ABS, CAP, C: CT, IDS, OF, LINKS, A, AIDS, REGN, USE, SECTORS, DEFAULT_UC, ROUNDS, START, TOPUP, BASE_EQ, BON, BIDS, rnd, half, rng, isOpen, price, up, bundle, canBuy, buy, buyBundle, undo, canUndo, value, absorb, exposed, baseDmg, draw, strike, drawBonus, applyBonus, awardsRound, finalAwards, score, report, advice };
   if (typeof module !== 'undefined') module.exports = root.ALPHA;
 })(typeof window !== 'undefined' ? window : globalThis);

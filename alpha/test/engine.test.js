@@ -30,6 +30,12 @@ const G3 = { round: 2, players: { a: { budget: 10, own: { grd: 2, inj: 0 }, boug
   const b0 = pu.budget; ok(A.buy(Gu, pu, 'grd') === '', 'strengthen'); ok(pu.own.grd === 1, 'now level 1'); ok(A.undo(Gu, pu, 'grd') === '' && pu.own.grd === 0 && pu.budget === b0, 'undo refunds, back to frozen level'); ok(A.undo(Gu, pu, 'grd') === 'frozen', 'cannot go below frozen');
   ok(A.buy(Gu, pu, 'out') === '' && pu.own.out === 0, 'buy new'); ok(A.undo(Gu, pu, 'out') === '' && pu.own.out == null && !pu.bought.out && pu.budget === b0, 'deselect refunds fully');
   const ids = A.OF('Govern').filter(i => A.isOpen(i, Gu)).slice(0, 3); const b1 = pu.budget, bd = A.buyBundle(Gu, pu, ids); ok(bd === '', 'bundle'); ids.forEach(i => ok(A.canUndo(pu, i), 'bundle part undoable')); ids.forEach(i => A.undo(Gu, pu, i)); ok(Math.abs(pu.budget - b1) < 0.01, 'bundle fully refunded'); }
+// automatic top-up: completing a group one by one earns the same discount as the bundle; undo claws it back
+{ const Gr = { round: 1, fx: {} }, mk = () => ({ budget: 200, own: {}, bought: {}, paid: {}, spent: 0 }), key = Object.keys(A.GROUPS).filter(k => A.GROUPS[k].length === 3 && A.GROUPS[k].every(i => A.isOpen(i, Gr)))[0], ids = A.GROUPS[key];
+  const p1 = mk(); let full = 0; ids.forEach(i => { full += A.price(Gr, p1, i); A.buy(Gr, p1, i); }); const pb = mk(); A.buyBundle(Gr, pb, ids);
+  ok(Math.abs(p1.spent - pb.spent) < 0.51, 'one by one costs the same as the bundle'); ok(p1.reb[key] > 0, 'rebate recorded');
+  ok(A.undo(Gr, p1, ids[0]) === '' && !p1.reb[key] && p1.budget === A.rnd(200 - (full - A.price(Gr, mk(), ids[0]))), 'undo gives rebate back');
+  ok(!pb.reb, 'bundle plus no double discount'); }
 // full games
 for (let s = 0; s < 3000; s++) { const r = game(['smart', 'balanced', 'bundler', 'random', 'hoarder', 'none', 'whale', 'security'], s, 'banking');
   Object.values(r.G.players).forEach(pl => { ok(pl.budget >= 0, 'budget never negative'); ok(Object.values(pl.own).every(l => l >= 0 && l <= 2), 'levels in range'); ok(isFinite(A.score(pl)), 'score finite'); const rep = A.report(r.G, Object.keys(r.G.players)[0]); ok(rep.cov.length === 8, 'report'); }); }
