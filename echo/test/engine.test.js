@@ -1,7 +1,7 @@
 const E = require('../game.js'); let n = 0;
 const ok = (c, m) => { n++; if (!c) { console.error('FAIL', m); process.exit(1); } };
 // data sanity
-ok(E.CARDS.length === 69 && E.SHORT.length === 10, 'card counts');
+ok(E.CARDS.length === 73 && E.SHORT.length === 10, 'card counts');
 E.USE.forEach(u => { ok(u.a.length === 10 && u.a.every(a => E.ATK[a]), 'use case attacks ' + u.k); });
 E.ALL.forEach(c => ok(E.DORDER.indexOf(c.d) >= 0 && c.m >= 0 && c.t >= 0, 'card ' + c.id));
 E.SHORT.forEach(s => s.breaks.forEach(a => ok(E.ATK[a], 'shortcut target ' + a)));
