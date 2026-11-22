@@ -126,7 +126,7 @@
     3: { name: 'Pressure', theme: 'Attackers get smarter', more: 'Semantic policy, red teams, agent identity and independent assurance open.' },
     4: { name: 'Reckoning', theme: 'Everything is tested', more: 'No new branches. Close your gaps, then everything is tested.' }
   };
-  const START = 40, TOPUP = { 2: 16, 3: 16, 4: 12 }, BASE_EQ = 40, EXPO = 1.4, RISE = 0.12, UPG = 0.6, BUNDLE = 0.85;
+  const START = 40, TOPUP = { 2: 16, 3: 16, 4: 12 }, BASE_EQ = 40, EXPO = 1.4, RISE = 0.12, UPG = 0.6, BUNDLE = 0.75;
 
   // surprise cards. g = for everyone, p = one random player
   const BON = {
