@@ -1,147 +1,84 @@
-/* ECHO · rules engine. Pure functions, no DOM. Deterministic except the attack draw (rng passed in). */
-(function () {
-  const SEV = { L: { p: .10, d: 4, t: 0, n: 'Low' }, M: { p: .25, d: 9, t: .5, n: 'Medium' }, H: { p: .40, d: 18, t: 1, n: 'High' }, C: { p: .60, d: 30, t: 2, n: 'Critical' } };
-  const UP = { L: 'M', M: 'H', H: 'C', C: 'C' };
-  const COST = { ctl: 5, ft: 3, scan: 3, fix: 6, mit: 4, ins: 3, defuse: 3 };
-  const SLOTS = { prv: { n: 'Prevent', d: 'Stop bad inputs and limit what the system can do' }, tst: { n: 'Test', d: 'Find the weakness before an attacker does' }, mon: { n: 'Detect', d: 'Spot problems quickly once the system is live' }, own: { n: 'Oversee & prove', d: 'People in charge, and evidence a regulator can inspect' } };
-  const CT = {
-    grd: { s: 'prv', n: 'Guardrails & input filtering', d: 'Blocks malicious or out-of-scope prompts before the model sees them.', ref: 'EU AI Act Art. 15' },
-    lpv: { s: 'prv', n: 'Least-privilege access', d: 'Gives the system only the data and permissions it really needs.', ref: 'GDPR Art. 25' },
-    ksw: { s: 'prv', n: 'Kill switch & rate limits', d: 'Lets you stop a runaway or misbehaving system at once.', ref: 'EU AI Act Art. 14' },
-    min: { s: 'prv', n: 'Data minimisation', d: 'Collects and keeps only the personal data that is necessary.', ref: 'GDPR Art. 5' },
-    rdt: { s: 'tst', n: 'Red-teaming', d: 'Experts attack the system before launch, like a real adversary.', ref: 'EU AI Act Art. 15' },
-    bia: { s: 'tst', n: 'Bias & fairness testing', d: 'Tests outcomes across groups before and after launch.', ref: 'EU AI Act Art. 10' },
-    evl: { s: 'tst', n: 'Accuracy & hallucination evals', d: 'Measures how often it is wrong, and how.', ref: 'EU AI Act Art. 15' },
-    pen: { s: 'tst', n: 'Penetration test & vulnerability scan', d: 'Looks for known flaws in code, models, libraries and servers.', ref: 'EU AI Act Art. 15 · DORA' },
-    dqc: { s: 'tst', n: 'Data quality & poisoning checks', d: 'Checks training data is clean, licensed and untampered.', ref: 'EU AI Act Art. 10' },
-    drf: { s: 'mon', n: 'Drift monitoring', d: 'Alerts you when performance quietly gets worse.', ref: 'EU AI Act Art. 72' },
-    anm: { s: 'mon', n: 'Anomaly & misuse alerts', d: 'Flags unusual use, attacks and abuse as they happen.', ref: 'EU AI Act Art. 15' },
-    log: { s: 'mon', n: 'Output logging & sampling', d: 'Records what it did and reviews a sample every week.', ref: 'EU AI Act Art. 12' },
-    esc: { s: 'mon', n: 'Incident detection & escalation', d: 'Staff know how to spot an incident and who to tell.', ref: 'EU AI Act Art. 73' },
-    hum: { s: 'own', n: 'Human-in-the-loop review', d: 'A named person approves high-impact decisions and can override.', ref: 'EU AI Act Art. 14' },
-    xai: { s: 'own', n: 'Explainability', d: 'Every decision comes with a reason people can understand.', ref: 'EU AI Act Art. 13' },
-    doc: { s: 'own', n: 'Documentation & audit trail', d: 'Technical records and logs a regulator can inspect.', ref: 'EU AI Act Arts. 11-12' },
-    ria: { s: 'own', n: 'Impact assessment (DPIA / FRIA)', d: 'Assesses the harm to people before the system goes live.', ref: 'GDPR Art. 35 · AI Act Art. 27' },
-    trn: { s: 'own', n: 'Transparency notice', d: 'Tells people they are dealing with an AI system.', ref: 'EU AI Act Art. 50' } };
-  const FITS = { chat: ['grd', 'rdt'], compl: ['bia', 'hum'], cred: ['dqc', 'doc'], fraud: ['rdt', 'anm'], aml: ['drf', 'evl'], doc: ['lpv', 'log'], coll: ['ksw', 'hum'], pay: ['hum', 'ksw'], robo: ['hum', 'evl'], suit: ['xai', 'bia'], wealth: ['evl', 'grd'], lake: ['lpv', 'pen'], fm: ['pen', 'anm'], offer: ['trn', 'ria'] };
-  const FND = {
-    gov: { n: 'AI governance framework', c: 8, d: 'Board-level policy, roles and reporting. In the round 4 audit, fines are halved and you gain +1 Trust.', ref: 'EU AI Act Art. 17 · ISO 42001' },
-    inv: { n: 'AI inventory & named owner', c: 2, d: 'You know every AI system you run and who owns it. Systems earn 3% more because accountability is clear, and negligence penalties in the audit are waived.', ref: 'EU AI Act Arts. 16, 26' },
-    pol: { n: 'AI policy & acceptable use', c: 3, d: 'Clear rules for staff and suppliers. Trust lost to incidents is cut by 50%.', ref: 'EU AI Act Art. 26' },
-    irp: { n: 'Incident response plan', c: 5, d: 'Roles and playbooks ready. Disclosing the flaw is free, and echoes from neighbours hurt 25% less.', ref: 'EU AI Act Art. 73' },
-    eth: { n: 'Ethics & risk committee', c: 6, d: 'Independent review of every system. All systems you own are scanned automatically.', ref: 'EU AI Act Art. 9' },
-    lit: { n: 'AI literacy programme', c: 6, d: 'Staff can judge what they read. Acting on a news card costs €1M, and a fake costs no Trust.', ref: 'EU AI Act Art. 4' },
-    ven: { n: 'Vendor due diligence', c: 5, d: 'Checks suppliers and shared models. Damage echoing from shared pipelines and models is cut by 50%.', ref: 'EU AI Act Art. 25 · DORA Art. 28' },
-    mpl: { n: 'Continuous monitoring platform', c: 5, d: 'One view of every system. Attack odds on all your systems are 20% lower.', ref: 'EU AI Act Art. 72' } };
-  const FIT_ODDS = .9, FIT_DMG = .95;
-  const hasFit = (id, ns) => !!(ns && ns.k && FITS[id] && ns.k.some(k => FITS[id].indexOf(k) >= 0));
-  const slotsUsed = ns => (ns && ns.k || []).map(k => CT[k] && CT[k].s);
-  const fnd = (g, pid, f) => !!(g.players[pid] && g.players[pid].fnd && g.players[pid].fnd[f]);
-  const START = 50, TOPUP = [0, 0, 25, 25, 15], MULT = [0, 0, 1.0, 1.4, 1.0];
-  const RATE = { min: .49, lim: .588, high: .70, shared: .42 };
-  const TIERN = { min: 'MINIMAL', lim: 'LIMITED RISK', high: 'HIGH-RISK', shared: 'SHARED' };
-  // topology: same for every sector pack (balanced once); packs re-skin names, categories, regulations
-  const NODES = {
-    chat: { price: 10, tier: 'lim', cat: 'cus', sev: 'H', pos: [180, 230] }, offer: { price: 10, tier: 'min', cat: 'cus', sev: 'L', pos: [180, 540], banned: true }, compl: { price: 12, tier: 'min', cat: 'cus', sev: 'L', pos: [180, 850] },
-    cred: { price: 16, tier: 'high', cat: 'rsk', sev: 'H', pos: [700, 880] }, fraud: { price: 16, tier: 'min', cat: 'rsk', sev: 'M', pos: [1000, 880] }, aml: { price: 18, tier: 'lim', cat: 'rsk', sev: 'L', pos: [1300, 880] },
-    doc: { price: 14, tier: 'min', cat: 'ops', sev: 'M', pos: [1350, 250] }, coll: { price: 14, tier: 'lim', cat: 'ops', sev: 'H', pos: [1680, 300], agentic: true }, pay: { price: 22, tier: 'high', cat: 'ops', sev: 'H', pos: [1500, 500], agentic: true },
-    robo: { price: 24, tier: 'high', cat: 'adv', sev: 'M', pos: [1250, 640] }, suit: { price: 24, tier: 'high', cat: 'adv', sev: 'M', pos: [900, 640] }, wealth: { price: 28, tier: 'lim', cat: 'adv', sev: 'H', pos: [1700, 700] },
-    lake: { price: 18, tier: 'shared', cat: 'hub', sev: 'C', pos: [560, 540] }, fm: { price: 20, tier: 'shared', cat: 'hub', sev: 'H', pos: [1000, 250] } };
-  const LINKS = [['lake','chat'],['lake','compl'],['lake','cred'],['lake','fraud'],['lake','aml'],['lake','suit'],['fm','chat'],['fm','doc'],['fm','coll'],['fm','pay'],['fm','wealth'],['fm','robo'],['fm','lake'],
-    ['cred','fraud'],['fraud','aml'],['doc','coll'],['coll','pay'],['robo','suit'],['robo','wealth'],['chat','offer'],['offer','compl']];
-  const NB = {}; Object.keys(NODES).forEach(k => NB[k] = []); LINKS.forEach(([a, b]) => { NB[a].push(b); NB[b].push(a); });
-  const CATS = { cus: 0, rsk: 1, ops: 2, adv: 3 };
-  const IDS = Object.keys(NODES);
-  const VULN = { chat: 'Prompt injection', offer: 'Manipulative design', compl: 'Biased outputs', cred: 'Biased or poisoned training data', fraud: 'Model evasion', aml: 'Model drift', doc: 'Sensitive-data leakage', coll: 'Excessive agent permissions', pay: 'Unauthorised agent actions', robo: 'Unsafe recommendations', suit: 'No explainability', wealth: 'Hallucinated output', lake: 'Data breach', fm: 'Zero-day in vendor model' };
-  const mk = (cats, n, regs, shared, tone) => ({ cats, n, regs, shared, tone });
-  const PACKS = {
-    banking: { name: 'Banking', cats: ['Customer', 'Risk & Fraud', 'Operations', 'Advice & Wealth'], regs: 'EU AI Act · DORA · MiFID II',
-      n: { chat: 'Customer Chatbot', offer: 'Manipulative Offers', compl: 'Complaints Triage', cred: 'Credit Scoring', fraud: 'Fraud Detection', aml: 'AML Monitor', doc: 'Document Processing', coll: 'Collections Agent', pay: 'Agentic Payments', robo: 'Robo-Adviser', suit: 'Suitability Checker', wealth: 'Wealth Copilot', lake: 'Customer Data Lake', fm: 'Foundation Model' } },
-    insurance: { name: 'Insurance', cats: ['Customer', 'Underwriting & Pricing', 'Claims', 'Distribution'], regs: 'EU AI Act · Solvency II · IDD',
-      n: { chat: 'Policy Chatbot', offer: 'Emotion-based Pricing', compl: 'Renewal Assistant', cred: 'Risk Scoring', fraud: 'Claims Fraud Detector', aml: 'Reinsurance Analytics', doc: 'Claims Document AI', coll: 'Subrogation Agent', pay: 'Agentic Claims Payer', robo: 'Product Recommender', suit: 'Needs Assessment', wealth: 'Broker Copilot', lake: 'Policyholder Data Lake', fm: 'Foundation Model' } },
-    health: { name: 'Healthcare', cats: ['Patient', 'Diagnostics & Triage', 'Operations', 'Clinical Support'], regs: 'EU AI Act · MDR · GDPR',
-      n: { chat: 'Patient Chatbot', offer: 'Patient Social Scoring', compl: 'Appointment Assistant', cred: 'Diagnostic Imaging', fraud: 'Triage Prioritiser', aml: 'Sepsis Alert', doc: 'Clinical Notes Scribe', coll: 'Bed & Discharge Agent', pay: 'Agentic Prescribing', robo: 'Treatment Recommender', suit: 'Trial Matching', wealth: 'Clinician Copilot', lake: 'Patient Record Lake', fm: 'Foundation Model' } },
-    energy: { name: 'Energy', cats: ['Customer', 'Grid & Assets', 'Operations', 'Trading & Markets'], regs: 'EU AI Act · NIS2 · CER',
-      n: { chat: 'Customer Chatbot', offer: 'Manipulative Tariff Nudging', compl: 'Billing Dispute Triage', cred: 'Grid Load Forecaster', fraud: 'Predictive Maintenance', aml: 'Smart Meter Analytics', doc: 'Field Report AI', coll: 'Outage Dispatch Agent', pay: 'Autonomous Grid Switching', robo: 'Energy Trading Bot', suit: 'Demand Response', wealth: 'Price Forecast Copilot', lake: 'Telemetry Data Lake', fm: 'Foundation Model' } },
-    telecom: { name: 'Telecom', cats: ['Customer', 'Network', 'Operations', 'Commercial'], regs: 'EU AI Act · NIS2 · GDPR',
-      n: { chat: 'Care Chatbot', offer: 'Emotion-based Upsell', compl: 'Churn Predictor', cred: 'Network Optimiser', fraud: 'SIM-swap Fraud Detector', aml: 'Anomaly Detection', doc: 'Contract Document AI', coll: 'Field Ops Agent', pay: 'Agentic Provisioning', robo: 'Offer Engine', suit: 'Credit Check', wealth: 'Sales Copilot', lake: 'Subscriber Data Lake', fm: 'Foundation Model' } } };
-  const ROUNDS = [null,
-    { n: 1, name: 'Launch', theme: 'Governance foundations', flip: 'Risk tiers revealed (EU AI Act)', more: 'Every system now shows its EU AI Act tier. One use case is a prohibited practice and is withdrawn. High-risk systems need 2 controls to run at full revenue.', attacks: false },
-    { n: 2, name: 'Scale', theme: 'Data and model quality', flip: 'Hidden flaws surface', more: 'Attacks begin. Every system hides a vulnerability. Scan to see it, then fix, mitigate, insure or accept.', attacks: true },
-    { n: 3, name: 'Crisis', theme: 'Security, agents and vendors', flip: 'Echo storm', more: 'A zero-day hits the shared model. Collections and payments agents go agentic: more revenue, higher severity. Attack odds are 1.4x.', attacks: true },
-    { n: 4, name: 'Reckoning', theme: 'Accountability and audit', flip: 'Regulator view', more: 'Audit: unscanned or accepted vulnerabilities cost Trust, uncontrolled high-risk systems are fined. A final dilemma decides the last Trust swing.', attacks: true } ];
-  const STEPS = ['flip', 'bid', 'build', 'deals', 'attack', 'settle'];
-  const STEPN = { flip: 'Flip', bid: 'Bid', build: 'Build', deals: 'Deals', attack: 'Attack', settle: 'Settle' };
-  const effC = (ns, r) => { const c = (ns && ns.c) || 0; return c >= 4 ? c : Math.min(3, c + (ns && (ns.lic || 0) >= r ? 1 : 0)); };
-  const ctlF = (c, a, b) => Math.pow(a, Math.min(c, 3)) * (c >= 4 ? b : 1);
-  const sevOf = (id, r) => { const n = NODES[id]; return n.agentic && r >= 3 ? UP[n.sev] : n.sev; };
-  const oddsOf = (id, r, ns) => { if (!ns || ns.fixed || !MULT[r]) return 0; if (id === 'fm' && r === 3) return .9; return Math.min(.95, SEV[sevOf(id, r)].p * MULT[r] * ctlF(effC(ns, r), .8, .9) * (hasFit(id, ns) ? FIT_ODDS : 1)); };
-  const nameOf = (pack, id) => (PACKS[pack] || PACKS.banking).n[id];
-  const revOf = (g, id, r, trust) => {
-    const ns = g.nodes[id], N = NODES[id]; if (!ns || !ns.by || ns.pause === r) return 0;
-    const ce = effC(ns, r); let b = RATE[N.tier] * N.price * (1 + .25 * Math.min(ce, 3) + ((ns.c || 0) >= 4 ? .125 : 0));
-    if (N.agentic && r >= 3) b *= 1.5; if (N.tier === 'high' && ce < 2) b *= .5;
-    b *= trust >= 7 ? 1.1 : trust <= 3 ? .75 : 1; if (fnd(g, ns.by, 'inv')) b *= 1.03;
-    if (N.cat !== 'hub') { const mine = IDS.filter(x => NODES[x].cat === N.cat && !NODES[x].banned); if (mine.length === 3 && mine.every(x => g.nodes[x] && g.nodes[x].by === ns.by)) b *= 1.2; }
-    if ((ns.c || 0) >= 4 && r === 4) b *= 1.15; return b; };
-  const holders = ns => ns.co ? [[ns.by, .5], [ns.co, .5]] : [[ns.by, 1]];
-  const CARDS = [null,
-    [{ real: true, h: 'Regulator guidance: high-risk systems need two controls before the audit', n: 'Official guidance' }, { real: false, h: 'Blog: "Controls are optional if your vendor is certified"', n: 'Unverified post' }],
-    [{ real: true, h: 'Security bulletin: attackers are probing exposed AI systems this round', n: 'Security bulletin' }, { real: false, h: 'Influencer: "Insurance is pointless, attackers only hit big firms"', n: 'Social media' }],
-    [{ real: true, h: 'Vendor advisory: a flaw is being exploited in a shared model', n: 'Vendor advisory' }, { real: false, h: 'Forum: "The model flaw is a hoax, ignore the patch"', n: 'Anonymous forum' }],
-    [{ real: true, h: 'Auditor notice: documented controls are scored first', n: 'Auditor notice' }, { real: false, h: 'Rumour: "The regulator audit has been cancelled"', n: 'Rumour' }]];
-  const CARD_COST = 3, ALERT = .8, LIC_SHARE = .25, CO_SHARE = .4;
-  const clamp = t => Math.max(0, Math.min(10, t));
-  const rnd = x => Math.round(x * 10) / 10;
-  /* sealed bids -> owners. g.bids[pid][id]=amount. Highest bid wins; ties go to the player with least cash. */
-  function resolveBids(g) {
-    const list = []; Object.keys(g.bids || {}).forEach(pid => Object.keys(g.bids[pid] || {}).forEach(id => { const a = +g.bids[pid][id]; if (a > 0 && NODES[id] && !NODES[id].banned && !(g.nodes[id] && g.nodes[id].by)) list.push({ pid, id, a, cash: g.players[pid].cash }); }));
-    list.sort((x, y) => y.a - x.a || x.cash - y.cash); const won = [];
-    list.forEach(b => { if (g.nodes[b.id] && g.nodes[b.id].by) return; const p = g.players[b.pid]; if (p.cash >= b.a) { p.cash = rnd(p.cash - b.a); g.nodes[b.id] = { by: b.pid, c: 0, bought: g.round }; if (fnd(g, b.pid, 'eth')) g.nodes[b.id].scanned = true; won.push(b); } });
-    return won; }
-  /* attack phase: the ONLY randomness in the game */
-  function attack(g, r, rng) {
-    const ev = [], loss = {}, tl = {}, hitP = {}, echoT = {}, add = (o, k, v) => o[k] = (o[k] || 0) + v;
-    if (MULT[r]) {
-      IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by || ns.fixed) return; const al = ((g.players[ns.by] && g.players[ns.by].alert === r) ? ALERT : 1) * (fnd(g, ns.by, 'mpl') ? .8 : 1);
-        const p = Math.min(.95, oddsOf(id, r, ns) * al), roll = rng(); ev.push({ t: 'atk', k: id, by: ns.by, co: ns.co || null, p, roll, hit: roll < p, sev: sevOf(id, r), echo: [] }); });
-      ev.filter(e => e.hit).forEach(e => { const ns = g.nodes[e.k], ce = effC(ns, r), d = SEV[e.sev].d * ctlF(ce, .85, .95) * (hasFit(e.k, ns) ? FIT_DMG : 1) * (ns.mit ? .5 : 1);
-        e.dmg = rnd(d); const lt = SEV[e.sev].t * (ns.mit ? .5 : 1);
-        holders(ns).forEach(([pid, sh]) => { add(loss, pid, (ns.ins ? d * .3 : d) * sh); add(tl, pid, lt * sh); hitP[pid] = 1; });
-        if ((ns.lic || 0) >= r && ns.licBy && g.players[ns.licBy]) add(tl, ns.licBy, 1); // lender shares the blame
-        NB[e.k].forEach(nb => { const nn = g.nodes[nb]; if (!nn || !nn.by) return; const dd = SEV[e.sev].d * .5 * ctlF(effC(nn, r), .85, 1); e.echo.push(nb);
-          holders(nn).forEach(([pid, sh]) => { const mod = (fnd(g, pid, 'irp') ? .75 : 1) * (NODES[e.k].cat === 'hub' && fnd(g, pid, 'ven') ? .5 : 1); add(loss, pid, (nn.ins ? dd * .3 : dd) * sh * mod); if (pid !== ns.by && pid !== ns.co) echoT[pid] = 1; }); }); });
-      IDS.forEach(id => { const ns = g.nodes[id]; if (ns && ns.by && ns.token === r && !ns.defused) { const dm = 6 * ctlF(effC(ns, r), .85, 1);
-        holders(ns).forEach(([pid, sh]) => { add(loss, pid, dm * sh); add(tl, pid, sh); hitP[pid] = 1; });
-        ev.push({ t: 'token', k: id, by: ns.by, hit: true, dmg: rnd(dm), sev: 'M', p: 1, roll: 0, echo: [] }); } });
-    }
-    if (r === 4) Object.keys(g.players).forEach(pid => { const d = (g.dil || {})[pid];
-      if (d === 'disclose') { add(loss, pid, fnd(g, pid, 'irp') ? 0 : 3); add(tl, pid, -1); ev.push({ t: 'dil', by: pid, k: 'dilemma', hit: false, label: 'Disclosed the flaw', p: 0, roll: 0, echo: [] }); }
-      else { const roll = rng(), leak = roll < .5; if (leak) add(tl, pid, 3); ev.push({ t: 'dil', by: pid, k: 'dilemma', hit: leak, label: leak ? 'Stayed quiet · it leaked' : 'Stayed quiet · got away with it', p: .5, roll, echo: [] }); } });
-    // shared-liability pacts split cash losses
-    (g.pacts || []).filter(p => p.on && p.from <= r && p.until >= r && g.players[p.a] && g.players[p.b]).forEach(p => { const t = (loss[p.a] || 0) + (loss[p.b] || 0); loss[p.a] = t / 2; loss[p.b] = t / 2; });
-    Object.keys(g.players).forEach(pid => { const p = g.players[pid]; const tv = tl[pid] || 0; let t = p.trust - (tv > 0 ? tv * (fnd(g, pid, 'pol') ? .5 : 1) : tv) - (echoT[pid] ? 1 : 0); if (!hitP[pid] && r >= 2) t += 1;
-      t -= payOut(p, loss[pid] || 0); p.trust = clamp(t); });
-    return { ev, loss, tl, echoT }; }
-  /* cash never goes below zero: an unpaid shortfall becomes a regulator enforcement, -1 Trust per started EUR 5M */
-  function payOut(p, x) { p.cash = rnd(p.cash - x); if (p.cash >= 0) return 0; const sh = -p.cash; p.cash = 0; p.debt = rnd((p.debt || 0) + sh); return Math.ceil(sh / 5); }
-  /* settle: revenue (with licence fees and co-owner splits), then the round-4 audit */
-  function settle(g, r) {
-    const out = {}, inc = {}; Object.keys(g.players).forEach(pid => { inc[pid] = 0; out[pid] = { rev: 0, lines: [] }; });
-    IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by || !g.players[ns.by]) return; let rev = revOf(g, id, r, g.players[ns.by].trust); if (!rev) return;
-      if ((ns.lic || 0) >= r && ns.licBy && g.players[ns.licBy]) { const fee = rev * LIC_SHARE; inc[ns.licBy] += fee; rev -= fee; out[ns.licBy].lines.push('Licence fee +€' + rnd(fee) + 'M'); }
-      holders(ns).forEach(([pid, sh]) => { inc[pid] += rev * sh; }); });
-    Object.keys(g.players).forEach(pid => { const p = g.players[pid]; p.cash = rnd(p.cash + inc[pid]); out[pid].rev = rnd(inc[pid]); });
-    if (r === 4) Object.keys(g.players).forEach(pid => { const p = g.players[pid]; let t = p.trust;
-      IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || ns.by !== pid) return; const N = NODES[id];
-        if (N.tier === 'high' && effC(ns, r) < 2) { const gv = fnd(g, pid, 'gov'); t -= payOut(p, gv ? 3 : 6) + (gv ? 1 : 2); out[pid].lines.push('Fined €6M · high-risk system without 2 controls'); }
-        if (!fnd(g, pid, 'inv') && !ns.fixed && !ns.mit && (!ns.scanned || ns.acc)) { t -= 1; out[pid].lines.push(ns.scanned ? 'Accepted risk logged against you' : 'Never scanned: negligence'); }
-        if ((ns.c || 0) >= 4) { t += 1; out[pid].lines.push('Certified system +1 Trust'); } });
-      if (fnd(g, pid, 'gov')) { t += 1; out[pid].lines.push('Governance framework +1 Trust'); }
-      p.trust = clamp(t); });
+/* ECHO team engine: pure functions, no DOM. Cooperative game: the whole room wins or loses together. */
+(function (root) {
+  'use strict';
+  const RAW = {"C":[{"id":"sec-pen-q","d":"SEC","n":"Prompt-injection test, quick","m":0.6,"t":1,"w":"Basic attack tests on the assistant","r":["LLM01","AIA15"]},{"id":"sec-pen-f","d":"SEC","n":"Red team, full","m":1.8,"t":3,"w":"Full adversarial testing of the whole system","r":["LLM01","LLM05","ATLAS","AIA15"]},{"id":"sec-guard","d":"SEC","n":"Input and output guardrails","m":0.9,"t":2,"w":"Filters bad prompts and unsafe answers","r":["LLM01","LLM05","LLM07"]},{"id":"sec-secrets","d":"SEC","n":"System prompt and secrets protection","m":0.4,"t":1,"w":"Keeps prompts, keys and tokens private","r":["LLM07","GDPR32"]},{"id":"sec-iam","d":"SEC","n":"Access control, least privilege","m":0.7,"t":1,"w":"Only the right people and tools can reach data","r":["LLM06","GDPR32"]},{"id":"sec-agent","d":"SEC","n":"Agent permission sandbox","m":0.8,"t":2,"w":"Limits what an AI agent can do on its own","r":["LLM06"]},{"id":"sec-rate","d":"SEC","n":"Rate limits and cost caps","m":0.4,"t":1,"w":"Stops abuse and runaway bills","r":["LLM10"]},{"id":"sec-enc","d":"SEC","n":"Encryption and key management","m":0.6,"t":1,"w":"Protects data at rest and in transit","r":["GDPR32"]},{"id":"sec-mon","d":"SEC","n":"Runtime monitoring and alerts","m":1.0,"t":2,"w":"Spots attacks and odd behaviour live","r":["AIA15","AIA72","DORAICT"]},{"id":"sec-ir","d":"SEC","n":"Incident response plan and drill","m":0.8,"t":2,"w":"Who does what in the first hours","r":["AIA73","GDPR33","DORAINC","NISTMANAGE"]},{"id":"sec-bcp","d":"SEC","n":"Failover and backup","m":0.9,"t":2,"w":"Keeps service running when something fails","r":["DORAICT"]},{"id":"sec-tlpt","d":"SEC","n":"Resilience test (threat-led)","m":1.5,"t":3,"w":"Advanced testing for critical services","r":["DORATEST"]},{"id":"rsk-ia-q","d":"RSK","n":"Impact assessment, quick","m":0.4,"t":1,"w":"First look at who could be harmed","r":["AIA9","NISTMAP"]},{"id":"rsk-ia-f","d":"RSK","n":"Impact assessment, full","m":1.0,"t":3,"w":"Detailed harm and likelihood analysis","r":["AIA9","NISTMAP"]},{"id":"rsk-class","d":"RSK","n":"EU AI Act risk classification","m":0.3,"t":1,"w":"Decides if the system is high risk","r":["AIA6"]},{"id":"rsk-prohib","d":"RSK","n":"Prohibited practices screen","m":0.2,"t":1,"w":"Makes sure nothing banned is being built","r":["AIA5"]},{"id":"rsk-fria","d":"RSK","n":"Fundamental rights impact assessment","m":0.8,"t":2,"w":"Checks effects on people rights","r":["AIA27"]},{"id":"rsk-reg","d":"RSK","n":"Risk register and named owners","m":0.3,"t":1,"w":"Every risk has an owner and a date","r":["AIA9","ISO42001","NISTGOV"]},{"id":"rsk-appetite","d":"RSK","n":"Risk appetite and limits","m":0.4,"t":1,"w":"Sets how much risk the business accepts","r":["NISTGOV"]},{"id":"rsk-scen","d":"RSK","n":"Scenario and stress testing","m":0.9,"t":2,"w":"Plays out bad days before they happen","r":["AIA9","DORATEST"]},{"id":"rsk-model","d":"RSK","n":"Independent model validation","m":1.0,"t":3,"w":"A second team checks the model","r":["AIA15","NISTMEAS"]},{"id":"rsk-conc","d":"RSK","n":"Concentration and vendor risk review","m":0.6,"t":2,"w":"Finds over-reliance on one provider","r":["DORA3P"]},{"id":"rsk-kri","d":"RSK","n":"Early-warning indicators","m":0.5,"t":1,"w":"Dashboard of risk signals","r":["AIA72","NISTMANAGE"]},{"id":"rsk-ins","d":"RSK","n":"Insurance and liability review","m":0.4,"t":1,"w":"Who pays if it goes wrong","r":["AIA9"]},{"id":"ai-bias-q","d":"AI","n":"Bias test, quick","m":0.5,"t":1,"w":"Basic fairness check on outcomes","r":["AIA10","AIA15","NISTMEAS"]},{"id":"ai-bias-f","d":"AI","n":"Bias test, full","m":1.5,"t":3,"w":"Fairness across groups and cases","r":["AIA10","AIA15","NISTMEAS"]},{"id":"ai-eval","d":"AI","n":"Accuracy and robustness benchmark","m":0.8,"t":2,"w":"Measures how well it really works","r":["AIA15","NISTMEAS"]},{"id":"ai-test","d":"AI","n":"Regression test suite","m":0.5,"t":1,"w":"Catches new bugs after every change","r":["AIA15"]},{"id":"ai-hall","d":"AI","n":"Hallucination and grounding tests","m":0.9,"t":2,"w":"Checks answers against real sources","r":["LLM09","LLM08"]},{"id":"ai-expl","d":"AI","n":"Explainability and reason codes","m":0.7,"t":2,"w":"Gives a reason for each decision","r":["AIA13","AIA86","GDPR22"]},{"id":"ai-hitl","d":"AI","n":"Human-in-the-loop design","m":0.8,"t":2,"w":"People can review and override","r":["AIA14"]},{"id":"ai-rollback","d":"AI","n":"Rollback and kill switch","m":0.5,"t":1,"w":"Stop or revert in minutes","r":["AIA14","AIA15"]},{"id":"ai-agent","d":"AI","n":"Agent action limits and approvals","m":0.7,"t":2,"w":"Risky actions need a person to approve","r":["LLM06","AIA14"]},{"id":"ai-adv","d":"AI","n":"Adversarial robustness test","m":1.0,"t":2,"w":"Tries to fool the model itself","r":["ATLAS","AIA15"]},{"id":"ai-card","d":"AI","n":"Model card and documentation","m":0.4,"t":1,"w":"Plain record of purpose and limits","r":["AIA11","AIA13"]},{"id":"ai-drift","d":"AI","n":"Drift monitoring","m":0.6,"t":1,"w":"Alerts when the model slowly goes wrong","r":["AIA72","NISTMANAGE"]},{"id":"ai-disc","d":"AI","n":"AI disclosure to users","m":0.2,"t":1,"w":"Tells people they are talking to AI","r":["AIA50"]},{"id":"ai-gpai","d":"AI","n":"Foundation model due diligence","m":0.5,"t":1,"w":"Checks the base model provider duties","r":["AIA53","AIA25"]},{"id":"dat-dpia","d":"DAT","n":"Data protection impact assessment","m":1.0,"t":3,"w":"Privacy risk study required for risky processing","r":["GDPR35"]},{"id":"dat-priv-q","d":"DAT","n":"Privacy review, quick","m":0.5,"t":1,"w":"Quick scan for personal data risks","r":["GDPR25"]},{"id":"dat-lawful","d":"DAT","n":"Lawful basis and consent","m":0.4,"t":1,"w":"Right to use each type of data","r":["GDPR6","GDPR5"]},{"id":"dat-min","d":"DAT","n":"Data minimisation and masking","m":0.6,"t":1,"w":"Use less personal data, hide the rest","r":["GDPR5","GDPR25"]},{"id":"dat-leak","d":"DAT","n":"Personal data leak scanner","m":0.6,"t":1,"w":"Finds personal data in outputs and logs","r":["LLM02","GDPR32"]},{"id":"dat-lineage","d":"DAT","n":"Data lineage map","m":0.5,"t":1,"w":"Where each record came from","r":["AIA10","LLM04"]},{"id":"dat-quality-q","d":"DAT","n":"Data quality sweep, quick","m":0.4,"t":1,"w":"Basic cleaning and checks","r":["AIA10"]},{"id":"dat-quality-f","d":"DAT","n":"Data quality sweep, full","m":1.1,"t":3,"w":"Full dataset validation","r":["AIA10"]},{"id":"dat-bias","d":"DAT","n":"Training data representativeness check","m":0.7,"t":2,"w":"Is every group fairly represented","r":["AIA10"]},{"id":"dat-pois","d":"DAT","n":"Poisoning and provenance checks","m":0.8,"t":2,"w":"Detects tampered or untrusted data","r":["LLM04"]},{"id":"dat-ret","d":"DAT","n":"Retention and erasure","m":0.5,"t":1,"w":"Delete data on time and on request","r":["GDPR17","GDPR5"]},{"id":"dat-dsar","d":"DAT","n":"Data subject rights process","m":0.5,"t":2,"w":"Access, correction and objection requests","r":["GDPRDSR","GDPR22"]},{"id":"dat-xborder","d":"DAT","n":"Cross-border transfer review","m":0.4,"t":1,"w":"Safeguards when data leaves the region","r":["GDPRCH5"]},{"id":"dat-vec","d":"DAT","n":"Vector store access controls","m":0.5,"t":1,"w":"Stops retrieval from leaking other data","r":["LLM08"]},{"id":"dat-synth","d":"DAT","n":"Synthetic data for testing","m":0.7,"t":2,"w":"Test without using real customer data","r":["GDPR25"]},{"id":"isg-vendor-q","d":"ISG","n":"Vendor audit, quick","m":0.4,"t":1,"w":"Questionnaire and evidence check","r":["LLM03","DORA3P"]},{"id":"isg-vendor-f","d":"ISG","n":"Vendor audit, full","m":1.0,"t":3,"w":"On-site or deep evidence review","r":["LLM03","DORA3P"]},{"id":"isg-sbom","d":"ISG","n":"AI bill of materials","m":0.4,"t":1,"w":"List of models, data and libraries used","r":["LLM03"]},{"id":"isg-dora-reg","d":"ISG","n":"Register of ICT third parties","m":0.5,"t":2,"w":"Required list of critical providers","r":["DORA3P"]},{"id":"isg-contract","d":"ISG","n":"Contract clauses: SLAs, audit rights, exit","m":0.5,"t":2,"w":"Rights you need from providers","r":["DORA3P","DORACON"]},{"id":"isg-policy","d":"ISG","n":"AI acceptable use policy","m":0.3,"t":1,"w":"Clear rules for staff","r":["ISO42001","NISTGOV"]},{"id":"isg-train","d":"ISG","n":"AI literacy training","m":0.5,"t":2,"w":"Staff understand what they are using","r":["AIA4"]},{"id":"isg-iso","d":"ISG","n":"ISO 42001 gap assessment","m":0.9,"t":3,"w":"Compare to the AI management standard","r":["ISO42001"]},{"id":"isg-qms","d":"ISG","n":"Quality management system","m":0.9,"t":3,"w":"Repeatable process for AI quality","r":["AIA17","ISO42001"]},{"id":"isg-audit","d":"ISG","n":"Internal audit of controls","m":0.9,"t":2,"w":"Independent check that controls work","r":["AIA17","NISTGOV"]},{"id":"isg-log","d":"ISG","n":"Audit logging and retention","m":0.6,"t":1,"w":"Automatic records of what happened","r":["AIA12"]},{"id":"isg-doc","d":"ISG","n":"Technical documentation file","m":0.7,"t":2,"w":"The file a regulator can ask for","r":["AIA11"]},{"id":"isg-deployer","d":"ISG","n":"Deployer duties checklist","m":0.4,"t":1,"w":"Follow provider instructions, monitor, inform","r":["AIA26"]},{"id":"isg-conf","d":"ISG","n":"Conformity assessment","m":1.0,"t":3,"w":"Formal check before putting on the market","r":["AIA43"]},{"id":"isg-eudb","d":"ISG","n":"EU database registration","m":0.2,"t":1,"w":"Register the high-risk system","r":["AIA49"]},{"id":"isg-incident-rep","d":"ISG","n":"Regulator incident reporting playbook","m":0.4,"t":1,"w":"Know what to report, to whom, how fast","r":["AIA73","GDPR33","DORAINC"]}],"A":[{"id":"a01","n":"Prompt injection steals customer data","v":"Critical","k":["sec-pen-q","sec-pen-f","sec-guard"]},{"id":"a02","n":"Personal data leaks in answers","v":"Critical","k":["dat-leak","dat-min"]},{"id":"a03","n":"Poisoned training or retrieval data","v":"Major","k":["dat-pois","dat-lineage"]},{"id":"a04","n":"Compromised third-party model or library","v":"Critical","k":["isg-vendor-q","isg-vendor-f","isg-sbom"]},{"id":"a05","n":"AI agent takes an unapproved action","v":"Critical","k":["sec-agent","ai-agent"]},{"id":"a06","n":"System prompt and keys exposed","v":"Minor","k":["sec-secrets","sec-guard"]},{"id":"a07","n":"Denial of wallet: runaway usage costs","v":"Minor","k":["sec-rate"]},{"id":"a08","n":"Biased decisions reach the press","v":"Critical","k":["ai-bias-q","ai-bias-f","dat-bias"]},{"id":"a09","n":"Confident wrong advice (hallucination)","v":"Major","k":["ai-hall","ai-hitl"]},{"id":"a10","n":"Customer cannot get an explanation","v":"Major","k":["ai-expl","dat-dsar"]},{"id":"a11","n":"A prohibited practice is built","v":"Critical","k":["rsk-prohib","rsk-class"]},{"id":"a12","n":"High-risk system launched without conformity","v":"Critical","k":["isg-conf","rsk-class","isg-eudb"]},{"id":"a13","n":"Regulator asks for logs and none exist","v":"Major","k":["isg-log","sec-mon"]},{"id":"a14","n":"Serious incident reported too late","v":"Critical","k":["isg-incident-rep","sec-ir"]},{"id":"a15","n":"Model drift degrades accuracy unnoticed","v":"Major","k":["ai-drift","sec-mon","rsk-kri"]},{"id":"a16","n":"Key provider outage, no fallback","v":"Major","k":["sec-bcp","isg-contract","rsk-conc","isg-dora-reg"]},{"id":"a17","n":"Nobody can stop the system","v":"Critical","k":["ai-rollback","ai-hitl"]},{"id":"a18","n":"Users do not know it is AI","v":"Minor","k":["ai-disc"]},{"id":"a19","n":"Personal data used without a legal basis","v":"Critical","k":["dat-lawful","dat-dpia"]},{"id":"a20","n":"Erasure request fails, data kept forever","v":"Minor","k":["dat-ret","dat-dsar"]},{"id":"a21","n":"Staff misuse AI tools","v":"Minor","k":["isg-policy","isg-train"]},{"id":"a22","n":"Audit finds no governance system","v":"Major","k":["isg-qms","isg-audit","isg-iso"]},{"id":"a23","n":"Harm to fundamental rights","v":"Major","k":["rsk-fria","rsk-ia-f"]},{"id":"a24","n":"Adversarial inputs fool the model","v":"Major","k":["ai-adv","ai-eval"]},{"id":"a25","n":"Data moved abroad without safeguards","v":"Major","k":["dat-xborder"]},{"id":"a26","n":"Insider pulls data with wide access","v":"Major","k":["sec-iam","sec-enc"]},{"id":"a27","n":"Retrieval exposes another customer data","v":"Major","k":["dat-vec","sec-iam"]},{"id":"a28","n":"Bad data drives wrong decisions","v":"Major","k":["dat-quality-q","dat-quality-f","dat-synth","dat-priv-q"]},{"id":"a29","n":"Resilience test fails (DORA)","v":"Major","k":["sec-tlpt","rsk-scen"]},{"id":"a30","n":"Unvalidated model fails in production","v":"Major","k":["rsk-model","ai-eval","ai-test"]},{"id":"a31","n":"Base model obligations missed","v":"Minor","k":["ai-gpai","isg-contract"]},{"id":"a32","n":"Nobody knows the model limits","v":"Minor","k":["ai-card","isg-doc"]},{"id":"a33","n":"Risk beyond appetite, no owner","v":"Minor","k":["rsk-reg","rsk-appetite","rsk-ia-q"]},{"id":"a34","n":"Deployer duties ignored","v":"Major","k":["isg-deployer","ai-hitl"]},{"id":"a35","n":"Uninsured loss","v":"Minor","k":["rsk-ins"]}]};
+  const DEPTS = { SEC: 'CISO / Security', RSK: 'Risk', AI: 'AI team', DAT: 'Data team', ISG: 'Info security group', RAI: 'RAI & Governance' };
+  const DORDER = ['SEC', 'RSK', 'AI', 'DAT', 'ISG'], DCOL = { SEC: '#5bc0eb', RSK: '#f2c14e', AI: '#b4a8ff', DAT: '#3dd6a3', ISG: '#ff8d9b', RAI: '#f39c3d' };
+  const ROUNDS = 4, RN = ['Discover and design', 'Data and build', 'Test', 'Release'];
+  const rnd = x => Math.round(x * 100) / 100;
+  const CARDS = RAW.C.map(c => ({ id: c.id, d: c.d, n: c.n, m: c.m, t: c.t, w: c.w, r: c.r, sc: 0 }));
+  // tempting shortcuts: cheap or fast now, they quietly break the listed attacks later
+  const SHORT = [
+    ['x1', 'AI', 'Launch to all customers now', 0.2, 0, 1, 0, 'Skips testing and staged rollout', ['a09', 'a30']],
+    ['x2', 'AI', 'Skip bias testing to save a week', 0, 0, 1, 0, 'Unfair outcomes go unchecked', ['a08']],
+    ['x3', 'AI', 'Use an unvetted open model', 0, 0, 0, 0.4, 'Unknown licence, data and security', ['a04']],
+    ['x4', 'DAT', 'Copy production data into test', 0, 0, 0, 0.7, 'Real personal data in a weak environment', ['a02', 'a19']],
+    ['x5', 'DAT', 'Keep all data, just in case', 0, 0, 0, 0.5, 'No erasure, no minimisation', ['a20']],
+    ['x6', 'SEC', 'Turn off logging to cut cost', 0, 0, 0, 0.6, 'No records, no incident evidence', ['a13']],
+    ['x7', 'SEC', 'Give the agent admin rights', 0, 0, 1, 0, 'One bad prompt can do anything', ['a05']],
+    ['x8', 'ISG', 'Approve the vendor on trust', 0, 0, 1, 0, 'Supply chain and contract risks', ['a04', 'a16']],
+    ['x9', 'ISG', 'Delay the incident report', 0, 0, 1, 0, 'Missed legal deadlines', ['a14']],
+    ['x10', 'RSK', 'Accept every risk, no owner', 0, 0, 0, 0.3, 'Nobody is accountable', ['a33']],
+  ].map(s => ({ id: s[0], d: s[1], n: s[2], m: s[3], t: s[4], saveT: s[5], saveM: s[6], w: s[7], breaks: s[8], r: [], sc: 1 }));
+  const ALL = CARDS.concat(SHORT), BYID = {}; ALL.forEach(c => BYID[c.id] = c);
+  const ATK = {}; RAW.A.forEach(a => ATK[a.id] = { id: a.id, n: a.n, v: a.v, k: a.k });
+  const USE = [
+    { k: 'bank', n: 'Bank loan assistant', b: 8, t: 8, x: 'Credit fairness, GDPR, DORA', a: ['a01', 'a02', 'a08', 'a10', 'a12', 'a14', 'a16', 'a19', 'a22', 'a29'] },
+    { k: 'ins', n: 'Insurance claims triage', b: 7, t: 7, x: 'Fraud, fairness, explanations', a: ['a03', 'a04', 'a08', 'a09', 'a10', 'a13', 'a14', 'a19', 'a25', 'a28'] },
+    { k: 'hr', n: 'CV screening for HR', b: 5.5, t: 7, x: 'High risk under the AI Act, bias', a: ['a08', 'a10', 'a11', 'a12', 'a19', 'a20', 'a21', 'a23', 'a32', 'a34'] },
+    { k: 'hosp', n: 'Hospital patient triage chatbot', b: 7, t: 9, x: 'Patient safety, health data', a: ['a02', 'a09', 'a14', 'a17', 'a18', 'a19', 'a23', 'a24', 'a26', 'a30'] },
+    { k: 'energy', n: 'Energy grid forecasting agent', b: 7.5, t: 9, x: 'Critical infrastructure, agent limits', a: ['a04', 'a05', 'a13', 'a15', 'a16', 'a17', 'a24', 'a29', 'a30', 'a31'] },
+    { k: 'tel', n: 'Telecom customer service agent', b: 7, t: 7, x: 'Prompt injection, disclosure, cost', a: ['a01', 'a02', 'a05', 'a06', 'a07', 'a09', 'a14', 'a18', 'a21', 'a27'] },
+  ];
+  const REASONS = [['untested', 'Not tested'], ['law', 'Breaks a law (EU AI Act)'], ['owner', 'No clear owner'], ['pii', 'Personal data at risk'], ['oversight', 'No human oversight'], ['dup', 'Already covered'], ['cost', 'Cost too high for the value'], ['shortcut', 'Risky shortcut']];
+  const REASON = {}; REASONS.forEach(r => REASON[r[0]] = r[1]);
+  const GR = { gold: 'Gold', silver: 'Silver', bronze: 'Bronze', fail: 'Fail' };
+
+  const hand = (dept, built) => ALL.filter(c => c.d === dept && !(built || {})[c.id]);
+  // votes: {pid:{cardId:true}}; players: {pid:{dept}}
+  function tally(votes, players) {
+    const t = {}; DORDER.forEach(d => t[d] = {});
+    Object.keys(votes || {}).forEach(pid => { const d = (players[pid] || {}).dept; if (!t[d]) return;
+      Object.keys(votes[pid] || {}).forEach(id => { if (votes[pid][id] && BYID[id] && BYID[id].d === d) t[d][id] = (t[d][id] || 0) + 1; }); });
+    return t; }
+  const rank = (t, k) => Object.keys(t || {}).filter(id => t[id] > 0).sort((a, b) => t[b] - t[a] || BYID[a].m - BYID[b].m || (a < b ? -1 : 1)).slice(0, k);
+  // two cards overlap when the same attack in this use case can be stopped by either
+  function overlaps(useIdx, a, b) { if (a === b) return false; return USE[useIdx].a.some(x => { const k = ATK[x].k; return k.indexOf(a) >= 0 && k.indexOf(b) >= 0; }); }
+  // RAI flags: {pid:{cardId:'ok'|'x:reason'}}; setflags: {pid:{dept:'ok'|'x:reason'}}
+  function count(src, get) { let ok = 0, x = 0; const why = {}; Object.keys(src || {}).forEach(p => { const v = get(src[p] || {}); if (!v) return; if (v === 'ok') ok++; else { x++; const r = v.slice(2); why[r] = (why[r] || 0) + 1; } }); return { ok, x, why }; }
+  const cardFlags = (flags, id) => count(flags, o => o[id]);
+  const setFlags = (sf, dept) => count(sf, o => o[dept]);
+  const crossed = f => f.x > 0 && f.x > f.ok;
+  // binding only in the final round: cards or a whole department set can be removed, nothing can be added
+  function vetoes(round, prop, flags, sf) {
+    const out = { cards: [], sets: [], count: 0 }; if (round < ROUNDS) return out;
+    DORDER.forEach(d => { const ids = Object.keys((prop || {})[d] || {}); if (!ids.length) return;
+      if (crossed(setFlags(sf, d))) { out.sets.push(d); out.count++; return; }
+      ids.forEach(id => { if (crossed(cardFlags(flags, id))) { out.cards.push(id); out.count++; } }); });
     return out; }
-  const owned = (g, pid) => IDS.filter(id => g.nodes[id] && g.nodes[id].by === pid);
-  function worth(g, pid) { let v = g.players[pid].cash; IDS.forEach(id => { const ns = g.nodes[id]; if (!ns || !ns.by) return; const h = holders(ns).find(x => x[0] === pid); if (!h) return; const c = ns.c || 0; v += h[1] * (.8 * NODES[id].price + 2 * c + (c >= 4 ? 3 : 0)); }); return v; }
-  const finalScore = (g, pid) => worth(g, pid) * (0.6 + 0.08 * g.players[pid].trust);
-  window.ECHO = { SLOTS, CT, FITS, FND, slotsUsed, fnd, hasFit, FIT_ODDS, FIT_DMG, effC, holders, payOut, CARDS, CARD_COST, ALERT, LIC_SHARE, CO_SHARE, SEV, COST, START, TOPUP, MULT, RATE, TIERN, NODES, LINKS, NB, IDS, VULN, PACKS, ROUNDS, STEPS, STEPN, ctlF, sevOf, oddsOf, nameOf, revOf, resolveBids, attack, settle, owned, worth, finalScore, clamp, rnd, CATS };
-})();
+  const vetoedIds = (v, prop) => v.cards.concat([].concat.apply([], v.sets.map(d => Object.keys((prop || {})[d] || {}))));
+  // one round: money adds up, departments work in parallel so time is the slowest card, minus saved time
+  function roundCost(ids, delay) { let m = 0, t = 0, sv = 0; ids.forEach(id => { const c = BYID[id]; m += c.m - (c.saveM || 0); t = Math.max(t, c.t); sv += c.saveT || 0; }); return { m: rnd(m), t: Math.max(0, t - sv) + (delay || 0) }; }
+  function totals(appr, delays) { let m = 0, t = 0; for (let r = 1; r <= ROUNDS; r++) { const ids = Object.keys((appr || {})[r] || {}); if (!ids.length && !(delays || {})[r]) continue; const c = roundCost(ids, (delays || {})[r]); m += c.m; t += c.t; } return { spent: rnd(m), time: t }; }
+  const builtSet = appr => { const s = {}; for (let r = 1; r <= ROUNDS; r++) Object.keys((appr || {})[r] || {}).forEach(id => s[id] = r); return s; };
+  // public threat briefing: a few attacks are named each round, to everyone
+  const intelAt = (useIdx, round) => USE[useIdx].a.filter((_, i) => i < (round === 1 ? 3 : round === 2 ? 6 : round === 3 ? 9 : 10)).map(id => ATK[id]);
+  function finish(useIdx, built, spent, time, budget, deadline) {
+    const broken = {}; Object.keys(built).forEach(id => { const c = BYID[id]; if (c && c.sc) c.breaks.forEach(a => broken[a] = id); });
+    const items = USE[useIdx].a.map(id => { const a = ATK[id], stop = a.k.filter(c => built[c] && !BYID[c].sc);
+      const st = broken[id] ? 'shortcut' : stop.length ? 'stopped' : 'missed'; return { a: id, n: a.n, v: a.v, st, by: stop[0] || null, sc: broken[id] || null }; });
+    const inc = items.filter(i => i.st !== 'stopped'), safe = !inc.some(i => i.v === 'Critical');
+    const bOk = spent <= budget + 1e-9, tOk = time <= deadline, fails = (safe ? 0 : 1) + (bOk ? 0 : 1) + (tOk ? 0 : 1);
+    const grade = fails === 0 ? (inc.length ? 'silver' : 'gold') : fails === 1 ? 'bronze' : 'fail';
+    return { items, inc, safe, bOk, tOk, grade, spent, time, budget, deadline }; }
+  // RAI judgment: a cross on a shortcut is right, a tick on a real control is right
+  function raiScore(flags) { let good = 0, n = 0; Object.keys(flags || {}).forEach(p => Object.keys(flags[p] || {}).forEach(id => { const c = BYID[id]; if (!c) return; n++; const v = flags[p][id]; if ((v === 'ok') === !c.sc) good++; })); return { good, n }; }
+  function assign(players) { // players: [{id}] in join order -> {id: dept}
+    const n = players.length, rai = n >= 4 ? Math.max(1, Math.round(n / 10)) : 0, out = {}; let di = 0, ri = 0;
+    const raiAt = {}; for (let i = 1; i <= rai; i++) raiAt[Math.min(n - 1, Math.round(i * n / (rai + 1)))] = 1;
+    players.forEach((p, i) => { if (raiAt[i] && ri < rai) { out[p.id] = 'RAI'; ri++; } else out[p.id] = DORDER[di++ % 5]; }); return out; }
+  function pickDept(players) { const c = {}; Object.keys(DEPTS).forEach(d => c[d] = 0); Object.keys(players || {}).forEach(id => { const d = players[id].dept; if (c[d] != null) c[d]++; });
+    const n = Object.keys(players || {}).length; if (n >= 4 && c.RAI < Math.max(1, Math.round((n + 1) / 10))) return 'RAI'; return DORDER.slice().sort((a, b) => c[a] - c[b] || DORDER.indexOf(a) - DORDER.indexOf(b))[0]; }
+  root.ECHO = { DEPTS, DORDER, DCOL, ROUNDS, RN, CARDS, SHORT, ALL, BYID, ATK, USE, REASONS, REASON, GR, rnd, hand, tally, rank, overlaps, cardFlags, setFlags, crossed, vetoes, vetoedIds, roundCost, totals, builtSet, intelAt, finish, raiScore, assign, pickDept };
+  if (typeof module !== 'undefined') module.exports = root.ECHO;
+})(typeof window !== 'undefined' ? window : globalThis);
