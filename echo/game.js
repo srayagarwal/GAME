@@ -56,6 +56,10 @@
       if (crossed(setFlags(sf, d))) { out.sets.push(d); out.count++; return; }
       ids.forEach(id => { if (crossed(cardFlags(flags, id))) { out.cards.push(id); out.count++; } }); });
     return out; }
+  // trim: votes {pid:{cardId:true}}. A card is trimmed when MORE than half of its department's players vote to trim it (a tie does not trim)
+  const deptSize = (players, d) => Object.keys(players || {}).filter(p => (players[p] || {}).dept === d && players[p].name).length;
+  const trimCount = (trim, id, players) => Object.keys(trim || {}).filter(p => (players[p] || {}).dept === BYID[id].d && (trim[p] || {})[id]).length;
+  const trimmed = (ids, trim, players) => ids.filter(id => { const n = deptSize(players, BYID[id].d); return n > 0 && trimCount(trim, id, players) * 2 > n; });
   const vetoedIds = (v, prop) => v.cards.concat([].concat.apply([], v.sets.map(d => Object.keys((prop || {})[d] || {}))));
   // one round: money adds up, departments work in parallel so time is the slowest card, minus saved time
   function roundCost(ids, delay) { let m = 0, t = 0, sv = 0; ids.forEach(id => { const c = BYID[id]; m += c.m - (c.saveM || 0); t = Math.max(t, c.t); sv += c.saveT || 0; }); return { m: rnd(m), t: Math.max(0, t - sv) + (delay || 0) }; }
@@ -79,6 +83,6 @@
     players.forEach((p, i) => { if (raiAt[i] && ri < rai) { out[p.id] = 'RAI'; ri++; } else out[p.id] = DORDER[di++ % 5]; }); return out; }
   function pickDept(players) { const c = {}; Object.keys(DEPTS).forEach(d => c[d] = 0); Object.keys(players || {}).forEach(id => { const d = players[id].dept; if (c[d] != null) c[d]++; });
     const n = Object.keys(players || {}).length; if (n >= 4 && c.RAI < Math.max(1, Math.round((n + 1) / 10))) return 'RAI'; return DORDER.slice().sort((a, b) => c[a] - c[b] || DORDER.indexOf(a) - DORDER.indexOf(b))[0]; }
-  root.ECHO = { DEPTS, DORDER, DCOL, ROUNDS, RN, CARDS, SHORT, ALL, BYID, ATK, USE, REASONS, REASON, GR, rnd, hand, tally, rank, overlaps, cardFlags, setFlags, crossed, vetoes, vetoedIds, roundCost, totals, builtSet, intelAt, finish, raiScore, assign, pickDept };
+  root.ECHO = { DEPTS, DORDER, DCOL, ROUNDS, RN, CARDS, SHORT, ALL, BYID, ATK, USE, REASONS, REASON, GR, rnd, hand, tally, rank, overlaps, cardFlags, setFlags, crossed, vetoes, vetoedIds, deptSize, trimCount, trimmed, roundCost, totals, builtSet, intelAt, finish, raiScore, assign, pickDept };
   if (typeof module !== 'undefined') module.exports = root.ECHO;
 })(typeof window !== 'undefined' ? window : globalThis);

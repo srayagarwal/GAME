@@ -43,4 +43,12 @@ let seed = 7; const R = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 for (let g = 0; g < 3000; g++) { const ui = Math.floor(R() * 6), U = E.USE[ui], appr = {}, built = {}, delays = {};
   for (let r = 1; r <= 4; r++) { appr[r] = {}; const k = Math.floor(R() * 8); for (let j = 0; j < k; j++) { const c = E.ALL[Math.floor(R() * E.ALL.length)]; if (!built[c.id]) { built[c.id] = r; appr[r][c.id] = 1; } } if (r === 4 && R() < .5) delays[4] = Math.floor(R() * 3); }
   const t = E.totals(appr, delays), f = E.finish(ui, E.builtSet(appr), t.spent, t.time, U.b, U.t); ok(isFinite(t.spent) && t.time >= 0 && ['gold', 'silver', 'bronze', 'fail'].indexOf(f.grade) >= 0 && f.items.length === 10, 'random game ' + g); }
+// trim: strictly more than half of the department must vote; a tie does not trim
+{ const pl = { a: { name: 'a', dept: 'DAT' }, b: { name: 'b', dept: 'DAT' }, c: { name: 'c', dept: 'DAT' }, d: { name: 'd', dept: 'DAT' }, s: { name: 's', dept: 'SEC' } };
+  ok(E.deptSize(pl, 'DAT') === 4 && E.deptSize(pl, 'SEC') === 1, 'dept size');
+  const tr = { a: { 'dat-leak': true }, b: { 'dat-leak': true }, c: { 'dat-min': true }, d: { 'dat-min': true, 'dat-leak': true }, s: { 'dat-leak': true } };
+  ok(E.trimCount(tr, 'dat-leak', pl) === 3, 'only own department votes count');
+  const out = E.trimmed(['dat-leak', 'dat-min'], tr, pl); ok(out.length === 1 && out[0] === 'dat-leak', 'majority trims, a 2 of 4 tie does not');
+  ok(E.trimmed(['sec-iam'], { s: { 'sec-iam': true } }, pl).length === 1, 'one-person department can trim its own card');
+  ok(E.trimmed(['dat-leak'], {}, pl).length === 0 && E.trimmed(['dat-leak'], tr, {}).length === 0, 'no votes or no players trims nothing'); }
 console.log('engine tests passed:', n);
