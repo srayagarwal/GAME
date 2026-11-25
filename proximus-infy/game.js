@@ -39,8 +39,9 @@
   function block(aid, levels) { let miss = 1 - BASE; const by = [], gap = []; Object.keys(AT[aid].c).forEach(cid => { const l = levels[cid] || 0, w = AT[aid].c[cid]; if (l) { miss *= 1 - Math.min(0.95, (CARD[cid].r === 2 ? LEVEL2 : LEVEL)[l] * w); by.push(cid); } else if (w >= 1 || CARD[cid].r === AT[aid].r) gap.push(cid); }); return { pct: Math.min(CAP, 1 - miss), by, gap }; }
   function cost1(sel) { return Object.keys(sel || {}).reduce((s, k) => s + sel[k] * CARD[k].p, 0); }
   function cost2(add) { return Object.keys(add || {}).reduce((s, k) => s + add[k] * (CARD[k].p + (CARD[k].r === 1 ? UPG : 0)), 0); }
-  function coins(p) { const c1 = START1 + EXTRA * (p.b1 || 0) - cost1(p.r1); const c2 = c1 + START2 + EXTRA * (p.b2 || 0) - cost2(p.r2); return { c1, c2 }; }
+  function coins(p) { p = Object.assign({}, p, { r1: p.r1 || {}, r2: p.r2 || {} }); const c1 = START1 + EXTRA * (p.b1 || 0) - cost1(p.r1); const c2 = c1 + START2 + EXTRA * (p.b2 || 0) - cost2(p.r2); return { c1, c2 }; }
   function evaluate(p) {
+    p = Object.assign({}, p, { r1: p.r1 || {}, r2: p.r2 || {}, b1: p.b1 || 0, b2: p.b2 || 0 });
     const a1 = draw(p.seed || 1, 1), a2 = draw(p.seed || 1, 2), L1 = p.r1 || {}, L2 = lv(L1, p.r2 || {});
     const r1 = a1.map(a => Object.assign({ a }, block(a, L1))), r2 = a2.map(a => Object.assign({ a }, block(a, L2)));
     const avg1 = r1.reduce((s, x) => s + x.pct, 0) / 3, avg2 = r2.reduce((s, x) => s + x.pct, 0) / 3, avg = (avg1 + avg2) / 2;

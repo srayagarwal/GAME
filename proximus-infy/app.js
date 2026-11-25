@@ -185,13 +185,14 @@
     $app.addEventListener('input', e => { const k = e.target.dataset && e.target.dataset.f; if (!k) return; ui.form[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value; });
     setInterval(() => { if (!cur || !(ui.screen === 'r1' || ui.screen === 'r2')) return; const t = document.getElementById('tm'), ms = remain(); if (t) { t.textContent = '⏱ ' + fmtT(ms); t.classList.toggle('low', ms < 15000); const sc = Math.ceil(ms / 1000); if (sc <= 10 && sc > 0 && sc !== ui.lastTick) { ui.lastTick = sc; sfx('tick'); } const cl = document.getElementById('cl'); } if (ms <= 0) submitRound(true); }, 250);
   }
-  function resume(p) { cur = p; if (p.done) return 'score'; if (p.r2s) return ui.animDone[p.id + 1] || 1 ? 'r2' : 'r2'; if (p.r1e) return 'att1'; if (p.r1s) return 'r1'; return p.sector ? 'usecase' : 'sector'; }
+  function resume(p) { p.r1 = p.r1 || {}; p.r2 = p.r2 || {}; p.b1 = p.b1 || 0; p.b2 = p.b2 || 0; cur = p; if (p.done) return 'score'; if (p.r2s) return ui.animDone[p.id + 1] || 1 ? 'r2' : 'r2'; if (p.r1e) return 'att1'; if (p.r1s) return 'r1'; return p.sector ? 'usecase' : 'sector'; }
   async function player() {
     bind(); DB.on(BASE + '/state', v => { const was = state.open; state = v || { open: false }; if (state.open !== was && (ui.screen === 'closed' || ui.screen === 'boot')) { if (ui.screen === 'closed' && state.open) go('details'); } });
     DB.on(BASE + '/pub', v => { pub = v || {}; if (ui.screen === 'board' || ui.screen === 'score') { if (ui.screen === 'board') render(); else { const e = document.querySelector('.row3 .pill:last-child'); if (e) { const l = rows(), rk = l.findIndex(x => x.id === cur.id) + 1; e.textContent = rk ? '#' + rk + ' / ' + l.length : '…'; } } } });
     const id = store.get(PIDK); let p = id ? await DB.get(BASE + '/priv/' + id) : null; const s = await DB.get(BASE + '/state'); state = s || { open: false };
     ui.form = {};
     if (p && p.done) { store.set(PIDK, ''); p = null; }
+    if (p) { p.r1 = p.r1 || {}; p.r2 = p.r2 || {}; p.b1 = p.b1 || 0; p.b2 = p.b2 || 0; }
     if (p) { const sc = resume(p); if (sc === 'att1' && !p.r2s) { ui.animDone[p.id + 1] = 1; } if (!p.done && p.r2s && remain0(p) <= 0) { ui.screen = 'r2'; cur = p; await submitRound(true); return; } if (!p.done && p.r1s && !p.r1e && remain1(p) <= 0 && sc === 'r1') { cur = p; ui.screen = 'r1'; await submitRound(true); return; } if (sc === 'att1') ui.animDone[p.id + 1] = 1; return go(sc); }
     go(state.open ? 'details' : 'closed');
   }
