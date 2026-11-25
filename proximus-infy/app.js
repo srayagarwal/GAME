@@ -40,17 +40,11 @@
   const arena = (cls = '') => { const t = cur ? tot() : 0, on = [t >= 1, t >= 4, t >= 8]; return `<div class="arena ${cls}" id="arena">${[0, 1, 2].map(i => { const d = (cls === 'sm' ? [150, 115, 85] : cls === 'lg' ? [280, 215, 150] : [210, 160, 115])[i]; return `<div class="ring ${on[i] ? '' : 'dim'}" style="width:${d}px;height:${d}px"></div>`; }).join('')}<div class="core" id="core">🤖</div></div>`; };
   const brand = '<div class="brand">● ● PROXIMUS × INFOSYS</div>';
   const LVN = ['', 'LIGHT', 'STRONG', 'VERY STRONG'];
-  const tok = (id, lvl, price, o = {}) => { const c = P.CARD[id], idx = o.i || 0, lock = o.lockMin != null && lvl <= o.lockMin;
-    const sl = id === 'MIT' && cur ? P.scanLv(P.lv(cur.r1, cur.r2)) : -1, need = sl === 0, capTxt = sl > 0 && lvl >= sl && lvl < 3 ? `MAX ${LVN[sl]} · YOUR SCAN` : '';
-    return `<div class="card l${lvl} ${o.fresh ? 'fresh' : ''} ${o.deal ? 'deal' : ''} ${need ? 'needscan' : ''}" style="--d:${idx * 55}ms" data-act="add" data-id="${id}">${o.nw ? '<span class="nw">NEW</span>' : ''}
-      <div class="gem">${lvl >= 3 ? 'MAX' : price}</div><div class="art">${c.e}</div><div class="cn">${esc(c.n)}</div><div class="ce">${esc(c.s)}</div>
-      <div class="stars"><i>★</i><i>★</i><i>★</i></div><div class="pw">${need ? '🔒 NEEDS A SCAN FIRST' : capTxt || (lvl ? LVN[lvl] + ' · ' + Math.round(P.LEVEL[lvl] * 100) + '%' : 'NOT BOUGHT')}</div>
-      <div class="ctl"><button class="cb m" data-act="sub" data-id="${id}" ${(lvl && !lock) ? '' : 'disabled'}>${lock && lvl ? '🔒' : '−'}</button><button class="cb p" data-act="add" data-id="${id}" ${lvl >= 3 ? 'disabled' : ''}>BUY</button></div></div>`; };
   const legend = () => `<div class="lvls"><div style="--c:#2be0ff"><b>● LIGHT · 50%</b><span>of the attack it covers is stopped</span></div><div style="--c:#3dffb0"><b>● STRONG · 70%</b><span>of the attack it covers is stopped</span></div><div style="--c:#ffcf4d"><b>● VERY STRONG · 100%</b><span>of the attack it covers is stopped</span></div></div>`;
   function vClosed() { return `${brand}<h1>Opening soon</h1><p>The game is not open right now. This page opens by itself when the host starts it.</p><div class="gap"></div><div class="link" data-act="login">Already played? See your scores</div>`; }
   function vDetails() {
     const f = ui.form, v = k => esc(f[k] || '');
-    return `${brand}<h1>Defend the<br>agent</h1><p>Two rounds. Two minutes each. Buy defences for your AI agent, then random attacks hit it. Beat the other players.</p>
+    return `${brand}<h1>Defend the<br>agent</h1><p>Two stages, DEFCON 3 then DEFCON 5. Two minutes each. Buy defences for your AI agent, then random attacks hit it. Beat the other players.</p>
     <div class="in hero" style="margin-top:12px"><label>USERNAME · SHOWN ON THE LEADERBOARD</label><input data-f="u" maxlength="16" autocomplete="off" value="${v('u')}" placeholder="Pick a username"></div>
     <div class="in"><label>FULL NAME</label><input data-f="name" autocomplete="off" value="${v('name')}"></div>
     <div class="in"><label>PHONE</label><input data-f="phone" type="tel" autocomplete="off" value="${v('phone')}"></div>
@@ -61,24 +55,41 @@
   }
   const vSector = () => `${brand}<h2>Choose your sector</h2><p>You will protect an AI agent from that world.</p><div style="margin-top:10px">${Object.keys(P.SECTORS).map(k => { const s = P.SECTORS[k]; return `<div class="sec ${cur.sector === k ? 'on' : ''}" data-act="sector" data-id="${k}"><span class="o">${s.e}</span><div>${s.n}<small>${s.sub}</small></div></div>`; }).join('')}</div>`;
   function vUse() { const s = P.SECTORS[cur.sector]; return `${brand}${arena('lg')}<div class="kick" style="text-align:center">YOUR AGENT · ${s.n.toUpperCase()}</div><h2 style="text-align:center">${s.agent}</h2><p style="text-align:center">${s.t}</p>
-    <p style="margin-top:12px;text-align:center"><b style="color:#fff">2 rounds · 3 random attacks each</b><br>Buy defences with your coins. Survive. Upgrade. Survive harder.</p><p style="margin-top:8px;text-align:center">⏱ <b style="color:var(--gold)">2:00</b> per round, or tap Submit when ready.</p>${legend()}<div class="gap"></div><button class="go gold" data-act="start1">ENTER ROUND 1 ▶</button>`; }
+    <p style="margin-top:12px;text-align:center"><b style="color:#fff">DEFCON 3, then DEFCON 5 · 3 random attacks each</b><br><span style="font-size:12px">DEFCON = Defense Readiness Condition</span><br>Buy defences with your coins. Survive. Upgrade. Survive harder.</p><p style="margin-top:8px;text-align:center">⏱ <b style="color:var(--gold)">2:00</b> per round, or tap Submit when ready.</p>${legend()}<div class="gap"></div><button class="go gold" data-act="start1">ENTER DEFCON 3 ▶</button>`; }
+  /* ---------- ring shop ---------- */
+  const LC = ['#2a3560', '#2be0ff', '#3dffb0', '#ffcf4d'], LNm = ['', 'Light', 'Strong', 'Very strong'];
+  const ell = (n, rx, ry, cx, cy) => Array.from({ length: n }, (_, i) => { const a = (-90 + i * 360 / n) * Math.PI / 180; return [cx + rx * Math.cos(a), cy + ry * Math.sin(a)]; });
+  const arcSVG = (l, sz = 50, rr = 22) => { const c = 2 * Math.PI * rr, seg = c / 3 - 4, k = sz / 50; return `<svg width="${sz}" height="${sz}" viewBox="0 0 50 50">${[0, 1, 2].map(i => `<circle cx="25" cy="25" r="${rr}" fill="none" stroke="${i < l ? LC[l] : '#2a3560'}" stroke-width="${3.5}" stroke-dasharray="${seg} ${c - seg}" stroke-dashoffset="${-(i * (c / 3))}" transform="rotate(-90 25 25)" stroke-linecap="round"/>`).join('')}</svg>`; };
+  const SHORT = { 'Vulnerability scanning': 'Vuln. scanning', 'Vulnerability mitigation': 'Vuln. mitigation', 'AI vulnerability scanning': 'AI vuln. scanning' };
+  const centreH = (hot) => { const s = P.SECTORS[cur.sector] || P.SECTORS.telecom; return `<div class="ctr ${hot ? 'hot' : ''}" id="ctr"><div class="k">YOUR AGENT</div><div class="a">${s.e}</div><b>${esc(s.agent)}</b><small>${esc(s.n)}</small></div>`; };
+  function slotH(id, x, y, lvl, price, o = {}) {
+    const c = P.CARD[id], sl = id === 'MIT' ? P.scanLv(P.lv(cur.r1, cur.r2)) : -1, need = sl === 0, cap = sl > 0 && lvl >= sl && lvl < 3 ? sl : 0, can = lvl > (o.lockMin || 0);
+    return `<div class="sl ${lvl ? 'on' : ''} ${need ? 'lock' : ''} ${o.fresh ? 'fresh' : ''} ${o.deal ? 'deal' : ''}" data-id="${id}" style="left:${(x / 390 * 100).toFixed(2)}%;top:${y}px;--d:${(o.i || 0) * 45}ms"><div class="w" data-act="add" data-id="${id}">${arcSVG(lvl)}<span>${c.e}</span>${need ? '<i class="lk">🔒</i>' : ''}</div>
+      <div class="n">${esc(SHORT[c.n] || c.n)}</div>${need ? '<div class="tg">needs a scan first</div>' : cap ? `<div class="tg">max ${LNm[cap]} · your scan</div>` : ''}
+      <div class="pm"><b class="m ${can ? '' : 'x'}" ${can ? `data-act="sub" data-id="${id}"` : ''}>−</b><b class="p ${lvl >= 3 || need ? 'x' : ''}" data-act="add" data-id="${id}">${lvl >= 3 ? 'MAX' : '+' + price}</b></div></div>`;
+  }
   function vShop(r) {
-    const co = P.coins(cur), left = r === 1 ? co.c1 : co.c2, buys = (cur.b1 || 0) + (cur.b2 || 0), dl = ui.dealt !== r; let dock;
-    if (r === 1) dock = `<div class="hand">${P.R1.map((c, i) => tok(c[0], cur.r1[c[0]] || 0, c[4], { i, deal: dl })).join('')}</div>`;
-    else dock = `<div class="sech">NEW ADVANCED DEFENCES</div><div class="hand">${P.R2.map((c, i) => tok(c[0], (cur.r2[c[0]] || 0), c[4], { i, deal: dl, nw: 1, fresh: (cur.r2[c[0]] || 0) > 0, lockMin: 0 })).join('')}</div>
-      <div class="sech">YOUR ROUND 1 DEFENCES · UPGRADE +${P.UPG} COINS PER LEVEL</div><div class="hand">${P.R1.map((c, i) => { const a = cur.r1[c[0]] || 0, b = cur.r2[c[0]] || 0; return tok(c[0], a + b, c[4] + P.UPG, { i, deal: dl, fresh: b > 0, lockMin: a }); }).join('')}</div>`;
+    const co = P.coins(cur), left = r === 1 ? co.c1 : co.c2, buys = (cur.b1 || 0) + (cur.b2 || 0), dl = ui.dealt !== r, dc = r === 1 ? 3 : 5; let stage;
+    const tab = r === 2 ? (ui.t2 || 'new') : 'r1', ring = (n, ry, cy) => ell(n, 146, ry, 195, cy);
+    if (tab === 'new') { const p = ring(P.R2.length, 220, 320); stage = P.R2.map((c, i) => slotH(c[0], p[i][0], p[i][1] - 4, cur.r2[c[0]] || 0, c[4], { i, deal: dl, fresh: (cur.r2[c[0]] || 0) > 0 })).join(''); }
+    else if (tab === 'mine') { const p = ring(P.R1.length, 236, 322); stage = P.R1.map((c, i) => { const a = cur.r1[c[0]] || 0, b = cur.r2[c[0]] || 0; return slotH(c[0], p[i][0], p[i][1], a + b, c[4] + P.UPG, { i, deal: dl, fresh: b > 0, lockMin: a }); }).join(''); }
+    else { const p = ring(P.R1.length, 236, 322); stage = P.R1.map((c, i) => slotH(c[0], p[i][0], p[i][1], cur.r1[c[0]] || 0, c[4], { i, deal: dl })).join(''); }
     ui.dealt = r;
-    return `<div class="topbar">${head(`<span class="pill">ROUND ${r}/2</span><span class="pill tm" id="tm">⏱ ${fmtT(remain())}</span><button class="pill mute" data-act="mute">${muted() ? '🔇' : '🔊'}</button>`)}
-    <div class="coins"><span class="coin">${left}</span><div><b id="cl">${left}</b><small>coins left</small></div><button class="buy" id="buy" data-act="buy" ${buys >= P.MAX_EXTRA ? 'disabled' : ''}>+${P.EXTRA} COINS<small>costs −${P.EXTRA_PEN} points</small></button></div></div>${arena('sm')}${dock}
-    <div class="tip"><span style="color:#2be0ff">● Light</span> &nbsp;<span style="color:#3dffb0">● Strong</span> &nbsp;<span style="color:#ffcf4d">● Very strong</span><br>Light 50%, Strong 70%, Very strong 100%. Tap BUY to raise a level, − to take it back. 3 random attacks hit when you submit.${buys ? ` Extra coin packs bought: ${buys}.` : ''}</div><div class="subw"><button class="go" data-act="submit">SUBMIT ROUND ${r} ▶</button></div>`;
+    const tabs = r === 2 ? `<div class="rtabs"><span class="${tab === 'new' ? 'on' : ''}" data-act="t2" data-id="new">DEFCON 5</span><span class="${tab === 'mine' ? 'on' : ''}" data-act="t2" data-id="mine">DEFCON 3 · upgrade +${P.UPG}</span></div>` : '';
+    return `<div class="topbar">${head(`<span class="pill">DEFCON ${dc}</span><span class="pill tm" id="tm">⏱ ${fmtT(remain())}</span><button class="pill mute" data-act="mute">${muted() ? '🔇' : '🔊'}</button>`)}
+    <div class="coins"><span class="coin">${left}</span><div><b id="cl">${left}</b><small>coins left</small></div><button class="buy" id="buy" data-act="buy" ${buys >= P.MAX_EXTRA ? 'disabled' : ''}>+${P.EXTRA} COINS<small>costs −${P.EXTRA_PEN} points</small></button></div></div>${tabs}
+    <div class="rg"><div class="el" style="width:74%;height:68%"></div><div class="el" style="width:49%;height:46%;opacity:.5"></div>${centreH()}${stage}</div>
+    <div class="tip">Tap <b>+</b> to buy a level, <b>−</b> to take it back. The arc fills as you add levels: <span style="color:#2be0ff">Light 50%</span> · <span style="color:#3dffb0">Strong 70%</span> · <span style="color:#ffcf4d">Very strong 100%</span>. 3 random attacks hit when you submit.${buys ? ` Extra coin packs bought: ${buys}.` : ''}</div><div class="subw"><button class="go" data-act="submit">SUBMIT DEFCON ${dc} ▶</button></div>`;
   }
   function vAttack(r) {
-    return `${head(`<span class="pill">ROUND ${r}/2</span>`)}${arena('lg')}<div class="shotlbl" id="lbl"></div><div class="bar"><i id="bar" style="width:0"></i></div><div id="rows"></div><div class="gap"></div><button class="go gold" id="nx" data-act="${r === 1 ? 'start2' : 'score'}" disabled>${r === 1 ? 'ROUND 2 ▶' : 'SEE MY SCORE ▶'}</button>`;
+    const dc = r === 1 ? 3 : 5;
+    return `${head(`<span class="pill">DEFCON ${dc}</span><span class="pill" id="albl">3 ATTACKS</span>`)}<div class="astrip" id="strip">${[1, 2, 3].map(i => `<div id="sp${i}"><b>${i}</b> Waiting<small></small></div>`).join('')}</div>
+    <div class="aw" id="aw"><div class="el" style="width:74%;height:70%"></div><div class="el" style="width:49%;height:46%;opacity:.5"></div>${centreH()}<div id="dfs"></div><div id="abn"></div></div><div id="rep"></div><div class="gap"></div><button class="go gold" id="nx" data-act="${r === 1 ? 'start2' : 'score'}" disabled>${r === 1 ? 'DEFCON 5 ▶' : 'SEE MY SCORE ▶'}</button>`;
   }
   function vScore() {
     const e = P.evaluate(cur), list = rows(), rank = list.findIndex(x => x.id === cur.id) + 1;
     return `${head('<span class="pill">FINAL</span>')}${arena('lg')}<div class="big">0<small>/100</small></div><div class="math">Blocked <b>${pc(e.avg)}%</b> overall → <b>${pc(e.avg)}% × ${pc(e.avg)}% = ${e.base}</b>${e.buys ? `<br>Extra coins bought: <b style="color:#ff9aa8">−${e.pen}</b>` : ''}</div>
-    <div class="row3"><span class="pill">R1 ${pc(e.avg1)}%</span><span class="pill">R2 ${pc(e.avg2)}%</span><span class="pill">${rank ? '#' + rank + ' / ' + list.length : '…'}</span></div><p style="text-align:center">Your analysis and the best strategy will be emailed after the event.</p><div class="gap"></div><button class="go" data-act="board">LEADERBOARD ▶</button>`;
+    <div class="row3"><span class="pill">DEFCON 3 ${pc(e.avg1)}%</span><span class="pill">DEFCON 5 ${pc(e.avg2)}%</span><span class="pill">${rank ? '#' + rank + ' / ' + list.length : '…'}</span></div><p style="text-align:center">Your analysis and the best strategy will be emailed after the event.</p><div class="gap"></div><button class="go" data-act="board">LEADERBOARD ▶</button>`;
   }
   function vBoard() {
     const all = rows(), list = ui.tab === 'All' ? all : all.filter(r => r.s === ui.tab), mine = ui.mine;
@@ -106,29 +117,50 @@
     const ang = Math.random() * 6.28, d = 50 + Math.random() * 70; s.animate([{ transform: 'translate(-50%,-50%) scale(.4)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(ang) * d}px),calc(-50% + ${Math.sin(ang) * d - 20}px)) scale(1.2)`, opacity: 0 }], { duration: 700 + Math.random() * 300, easing: 'ease-out' }).onfinish = () => s.remove(); } }
   function confetti() { for (let i = 0; i < 60; i++) { const s = document.createElement('i'); s.className = 'cf'; s.style.left = Math.random() * 100 + 'vw'; s.style.background = ['#ffcf4d', '#2be0ff', '#3dffb0', '#ff4a63', '#8a5cff'][i % 5]; s.style.animationDelay = Math.random() * .8 + 's'; s.style.animationDuration = 2 + Math.random() * 1.5 + 's'; document.body.appendChild(s); setTimeout(() => s.remove(), 4500); } }
   function scoreFx() { const e = P.evaluate(cur), el = document.querySelector('.big'); if (!el) return; const t0 = performance.now(), tgt = e.score; const tick = () => { const k = Math.min(1, (performance.now() - t0) / 1400); el.firstChild.nodeValue = Math.round(tgt * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(tick); else { sfx(tgt >= 50 ? 'fanfare' : 'sad'); if (tgt >= 50) confetti(); } }; sfx('drumroll', 1.2); tick(); }
-  /* attack animation: projectiles fly at the agent, the shield flashes, the % blocked is stamped */
+  /* ---------- attack sequence: bolt, missile, heavy missile ---------- */
+  const WEAPON = {
+    1: w => `<svg width="${w}" viewBox="0 0 60 120"><defs><linearGradient id="wb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4a6300"/><stop offset="1" stop-color="#ff4a63"/></linearGradient></defs><rect x="26" y="0" width="8" height="70" fill="url(#wb)"/><polygon points="34,50 20,80 30,80 24,112 44,70 33,70 40,50" fill="#ffd166" stroke="#ff4a63" stroke-width="2"/></svg>`,
+    2: w => `<svg width="${w}" viewBox="0 0 60 140"><defs><linearGradient id="wm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd16600"/><stop offset="1" stop-color="#ff9f43"/></linearGradient></defs><path d="M30 0 L40 34 L20 34 Z" fill="url(#wm)"/><polygon points="20,70 6,48 20,50" fill="#ff4a63"/><polygon points="40,70 54,48 40,50" fill="#ff4a63"/><path d="M20 34 H40 V92 L30 134 L20 92 Z" fill="#e8ecf6" stroke="#ff4a63" stroke-width="2"/><path d="M20 92 L30 134 L40 92 Z" fill="#ff4a63"/><rect x="20" y="58" width="20" height="6" fill="#ff4a63"/></svg>`,
+    3: w => `<svg width="${w}" viewBox="0 0 90 160"><defs><linearGradient id="wh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4a6300"/><stop offset="1" stop-color="#ff9f43"/></linearGradient></defs><path d="M45 0 L62 38 L28 38 Z" fill="url(#wh)"/><polygon points="28,86 6,52 28,56" fill="#ff3b3b"/><polygon points="62,86 84,52 62,56" fill="#ff3b3b"/><path d="M28 38 H62 V104 L45 156 L28 104 Z" fill="#e8ecf6" stroke="#ff3b3b" stroke-width="2.5"/><path d="M28 104 L45 156 L62 104 Z" fill="#ff3b3b"/><rect x="28" y="62" width="34" height="7" fill="#ff3b3b"/><circle cx="45" cy="84" r="6" fill="#ffd166"/></svg>` };
+  const WNAME = ['', 'Bolt', 'Missile', 'Heavy missile'], WW = [0, 40, 54, 78];
   function runAttacks(r) {
-    const res = P.evaluate(cur)['r' + r], $a = document.getElementById('arena'), $c = document.getElementById('core'), $l = document.getElementById('lbl'), $r = document.getElementById('rows'), $b = document.getElementById('bar'), $n = document.getElementById('nx');
-    const row = x => { const a = P.AT[x.a], cls = x.pct >= .7 ? '' : x.pct >= .45 ? 'w' : 'l', why = x.by.length ? 'Stopped by ' + x.by.map(i => P.CARD[i].n).join(', ') : 'Nothing in place', miss = x.pct < .7 && x.gap.length ? '. Missing: ' + x.gap.map(i => P.CARD[i].n).join(', ') : '';
-      return `<div class="atk"><span class="e">${a.e}</span><div><b>${a.n}</b><small>${esc(why + miss)}</small></div><span class="p ${cls}">${pc(x.pct)}%</span></div>`; };
-    const finish = () => { const avg = res.reduce((s, x) => s + x.pct, 0) / 3; $l.textContent = ''; $b.style.width = pc(avg) + '%'; $r.insertAdjacentHTML('beforeend', `<p style="text-align:center;margin-top:8px">Round ${r}: <b style="color:#fff">${pc(avg)}%</b> blocked</p>`); $n.disabled = false; ui.animDone[cur.id + r] = 1; };
-    if (ui.animDone[cur.id + r]) { $r.innerHTML = res.map(row).join(''); finish(); return; }
-    let i = 0, sum = 0;
+    const res = P.evaluate(cur)['r' + r], L = r === 1 ? cur.r1 : P.capMit(P.lv(cur.r1, cur.r2)), $a = document.getElementById('aw'), $d = document.getElementById('dfs'), $b = document.getElementById('abn'), $n = document.getElementById('nx'), $rep = document.getElementById('rep'), $ph = document.querySelector('.ph');
+    const owned = Object.keys(L).filter(k => L[k] > 0), pos = ell(owned.length, 140, 205, 195, 320);
+    $d.innerHTML = owned.map((id, i) => `<div class="dfi" data-id="${id}" style="left:${(pos[i][0] / 390 * 100).toFixed(2)}%;top:${pos[i][1]}px"><div class="w">${arcSVG(L[id], 44)}<span>${P.CARD[id].e}</span></div></div>`).join('');
+    const sp = i => document.getElementById('sp' + (i + 1)), cls = p => p >= .7 ? 'g' : p >= .45 ? 'w' : 'l';
+    const setSp = (i, st, t, s) => { const e = sp(i); e.className = st; e.innerHTML = `<b>${i + 1}</b> ${t}<small>${s}</small>`; };
+    const replay = () => {
+      const avg = res.reduce((s, x) => s + x.pct, 0) / 3; $a.classList.add('gone'); document.getElementById('strip').classList.add('gone'); document.getElementById('albl').textContent = pc(avg) + '% BLOCKED';
+      $rep.innerHTML = `<div class="rph"><b>WHAT HIT YOU</b><span>DEFCON ${r === 1 ? 3 : 5} · average ${pc(avg)}% blocked</span></div>` + res.map(x => { const a = P.AT[x.a];
+        return `<div class="rc"><div class="rt"><span class="e">${a.e}</span><b>${a.n}</b><span class="p ${cls(x.pct)}">${pc(x.pct)}%</span></div><small>${esc(a.t)}</small><div class="rbar"><i class="${cls(x.pct)}" style="width:${pc(x.pct)}%"></i></div>
+        <div class="rs">Stopped by: ${x.by.length ? x.by.map(i => P.CARD[i].e + ' ' + esc(P.CARD[i].n)).join(' · ') : 'nothing in place'}</div>${x.pct < .7 && x.gap.length ? `<div class="rg2">Gap: ${x.gap.map(i => esc(P.CARD[i].n)).join(', ')}</div>` : ''}</div>`; }).join('');
+      $n.disabled = false; ui.animDone[cur.id + r] = 1;
+    };
+    if (ui.animDone[cur.id + r]) { replay(); return; }
+    res.forEach((x, i) => setSp(i, '', 'Waiting', ''));
+    let i = 0;
     const step = () => {
-      if (i >= res.length) { sfx('fanfare'); finish(); return; }
-      const x = res[i], a = P.AT[x.a], W = $a.clientWidth, H = $a.clientHeight, ang = Math.random() * Math.PI * 2, sx = W / 2 + Math.cos(ang) * W * .7, sy = H / 2 + Math.sin(ang) * H * .7;
-      $l.textContent = `⚠ INCOMING ${i + 1} OF 3 · ${a.n.toUpperCase()}`; sfx('whoosh');
-      const p = document.createElement('div'); p.className = 'proj'; $a.appendChild(p);
-      const an = p.animate([{ left: sx + 'px', top: sy + 'px', opacity: 0 }, { left: sx + 'px', top: sy + 'px', opacity: 1, offset: .1 }, { left: W / 2 + 'px', top: H / 2 + 'px', opacity: 1 }], { duration: 900, easing: 'ease-in', fill: 'forwards' });
+      if (i >= res.length) { sfx('fanfare'); setTimeout(replay, 1300); return; }
+      const x = res[i], a = P.AT[x.a], k = i + 1, W = $a.clientWidth, H = $a.clientHeight, cx = W / 2, cy = 314;
+      setSp(i, 'now', 'Incoming', 'hits now');
+      $b.innerHTML = `<div class="abn s${k}"><div class="kk">ATTACK ${k} OF 3 · ${WNAME[k].toUpperCase()}</div><b>${a.e} ${a.n}</b><small>${esc(a.t)}</small></div>`; sfx('whoosh'); buzz(10);
+      const side = [-1, 0, 1][i], sx = cx + side * W * .34, sy = 90, ang = Math.atan2(-(cx - sx), (cy - sy)) * 180 / Math.PI, w = WW[k], hh = w * (k === 1 ? 2 : k === 2 ? 2.33 : 1.78);
+      const m = document.createElement('div'); m.className = 'wp'; m.innerHTML = WEAPON[k](w); $a.appendChild(m);
+      const an = m.animate([{ left: sx + 'px', top: sy + 'px', transform: `translate(-50%,0) rotate(${ang}deg)`, opacity: 0 }, { opacity: 1, offset: .12 }, { left: cx + 'px', top: (cy - hh * .9) + 'px', transform: `translate(-50%,0) rotate(${ang}deg)`, opacity: 1 }], { duration: 1100 - k * 90, delay: 900, easing: 'ease-in', fill: 'forwards' });
       an.onfinish = () => {
-        p.remove(); const cls = x.pct >= .7 ? '' : x.pct >= .45 ? 'w' : 'l';
-        const fx = document.createElement('div'); fx.className = 'fx ' + (x.pct < .45 ? 'hurt' : ''); $a.appendChild(fx); setTimeout(() => fx.remove(), 700);
-        const st = document.createElement('div'); st.className = 'stamp ' + cls; st.textContent = pc(x.pct) + '% BLOCKED'; $a.appendChild(st); setTimeout(() => st.remove(), 1500);
-        $c.classList.remove('shk'); void $c.offsetWidth; $c.classList.add('shk'); if (x.pct < .45) { const v = document.createElement('div'); v.className = 'vig'; document.body.appendChild(v); setTimeout(() => v.remove(), 700); } sfx(x.pct >= .45 ? 'shield' : 'boom'); buzz(x.pct >= .45 ? 20 : [40, 30, 60]);
-        $r.insertAdjacentHTML('beforeend', row(x)); sum += x.pct; $b.style.width = pc(sum / (i + 1)) + '%'; i++; setTimeout(step, 1500);
+        m.remove(); const hot = x.pct < .45;
+        const bl = document.createElement('div'); bl.className = 'blast'; bl.style.setProperty('--sz', [0, 120, 180, 260][k] + 'px'); bl.textContent = '💥'; $a.appendChild(bl); setTimeout(() => bl.remove(), 800);
+        const fx = document.createElement('div'); fx.className = 'fx ' + (hot ? 'hurt' : ''); $a.appendChild(fx); setTimeout(() => fx.remove(), 700);
+        $ph.classList.remove('s1', 's2', 's3'); void $ph.offsetWidth; $ph.classList.add('s' + k); setTimeout(() => $ph.classList.remove('s' + k), 800);
+        const v = document.createElement('div'); v.className = 'vig v' + k; document.body.appendChild(v); setTimeout(() => v.remove(), 900);
+        const c = document.getElementById('ctr'); c.classList.add('hot'); setTimeout(() => c.classList.remove('hot'), 900);
+        sfx(x.pct >= .45 ? 'shield' : 'boom'); if (k > 1) setTimeout(() => sfx('boom'), 120); buzz(k === 1 ? 25 : k === 2 ? [40, 30, 50] : [70, 40, 90]);
+        x.by.forEach(id => { const e = $d.querySelector(`.dfi[data-id="${id}"]`); if (e) { e.classList.add('help'); setTimeout(() => e.classList.remove('help'), 1800); } });
+        const st = document.createElement('div'); st.className = 'bstamp ' + cls(x.pct); st.innerHTML = `${pc(x.pct)}% BLOCKED`; $a.appendChild(st); setTimeout(() => st.remove(), 1700);
+        setSp(i, 'ok ' + cls(x.pct), 'Blocked', pc(x.pct) + '%'); i++; setTimeout(() => { $b.innerHTML = ''; step(); }, 2100);
       };
     };
-    setTimeout(step, 500);
+    setTimeout(step, 400);
   }
   /* actions */
   const valid = () => { const f = ui.form, d = String(f.phone || '').replace(/\D/g, '');
@@ -153,7 +185,7 @@
   function add(id) {
     const r = ui.screen === 'r2' ? 2 : 1, c = P.CARD[id], co = P.coins(cur), left = r === 1 ? co.c1 : co.c2, price = r === 1 ? c.p : c.p + (c.r === 1 ? P.UPG : 0);
     if (r === 1 && c.r === 2) return; const have = (cur.r1[id] || 0) + (cur.r2[id] || 0);
-    const bad = () => { sfx('deny'); const el = document.querySelector(`.tok[data-id="${id}"]`); el && (el.classList.add('shake'), setTimeout(() => el.classList.remove('shake'), 400)); buzz(30); };
+    const bad = () => { sfx('deny'); const el = document.querySelector(`.sl[data-id="${id}"]`); el && (el.classList.add('shake'), setTimeout(() => el.classList.remove('shake'), 400)); buzz(30); };
     if (have >= 3) { toast('Already at the maximum level'); return bad(); }
     if (id === 'MIT') { const sl = P.scanLv(P.lv(cur.r1, cur.r2)); if (!sl) { toast('Mitigation needs a scan first: buy a scanning card'); return bad(); } if (have >= sl) { toast('Mitigation cannot be stronger than your scan. Upgrade your scan first'); return bad(); } }
     if (left < price) { toast(`You need ${price - left} more coins`); const b = document.getElementById('buy'); b && (b.classList.remove('pulse'), void b.offsetWidth, b.classList.add('pulse')); return bad(); }
@@ -168,7 +200,7 @@
     // never end a round with negative coins (cannot happen through the UI, but guard anyway)
     cur['r' + r + 'e'] = DB.now();
     if (r === 2) { const e = P.evaluate(cur); cur.score = e.score; cur.done = 1; cur.sc1 = pc(e.avg1); cur.sc2 = pc(e.avg2); await saveNow(); await DB.set(BASE + '/pub/' + cur.id, { u: cur.u, s: cur.sector, sc: e.score, done: 1, t: cur.t0 }); } else await saveNow();
-    ui.subm = 0; if (auto) toast('Time is up. Round submitted.'); go(r === 1 ? 'att1' : 'att2');
+    ui.subm = 0; if (auto) toast('Time is up. Submitted.'); go(r === 1 ? 'att1' : 'att2');
   }
   const confirm0 = () => true;
   async function markDQ(p) { try { cur = p; p.dq = 1; await DB.set(BASE + '/priv/' + p.id, p); await DB.set(BASE + '/pub/' + p.id, { u: p.u, s: p.sector || '', sc: 0, done: 0, dq: 1, t: p.t0 }); } catch (e) {} store.set(PIDK, ''); cur = null; sfx('sad'); go('dq'); }
@@ -185,9 +217,9 @@
     sector(el) { cur.sector = el.dataset.id; save(); DB.set(BASE + '/pub/' + cur.id, { u: cur.u, s: cur.sector, sc: 0, done: 0, t: cur.t0 }); go('usecase'); },
     async start1() { const o = await DB.get(BASE + '/state'); state = o || state; if (!state.open && !cur.r1s) return go('closed'); if (!cur.r1s) cur.r1s = DB.now(); await saveNow(); go('r1'); },
     add: el => add(el.dataset.id), sub: el => sub(el.dataset.id), buy, submit: () => submitRound(false),
-    async start2() { if (!cur.r2s) cur.r2s = DB.now(); await saveNow(); go('r2'); }, score: () => go('score'), board() { ui.mine = new Set([cur.id]); ui.tab = 'All'; go('board'); },
+    async start2() { ui.t2 = 'new'; if (!cur.r2s) cur.r2s = DB.now(); await saveNow(); go('r2'); }, score: () => go('score'), board() { ui.mine = new Set([cur.id]); ui.tab = 'All'; go('board'); },
     mute() { store.set('px_mute', muted() ? '0' : '1'); bedOn(); render(); },
-    tab(el) { ui.tab = el.dataset.id; render(); },
+    tab(el) { ui.tab = el.dataset.id; render(); }, t2(el) { ui.t2 = el.dataset.id; ui.dealt = 2; render(); },
     again() { ui.form = {}; ui.mine = new Set(); cur = null; store.set(PIDK, ''); go('details'); },
   };
   function bind() {
