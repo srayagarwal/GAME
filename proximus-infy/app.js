@@ -19,6 +19,7 @@
   const bedOn = () => { try { SFX.setMute(muted()); SFX.bed(!muted() && (ui.screen === 'r1' || ui.screen === 'r2')); } catch (e) {} };
   const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
   const playURL = () => location.origin + location.pathname + (Q.get('room') ? '?room=' + ROOM : '');
+  const DQ_MS = 15 * 60000, isDQ = r => r && !r.done && DB.now() > r.t + DQ_MS;
   let state = { open: false }, pub = {};
   const rows = () => Object.keys(pub).map(id => Object.assign({ id }, pub[id])).filter(r => r.done).sort((a, b) => b.sc - a.sc || a.t - b.t);
   function lbHTML(list, mine, n) {
@@ -80,9 +81,10 @@
   function vBoard() {
     const all = rows(), list = ui.tab === 'All' ? all : all.filter(r => r.s === ui.tab), mine = ui.mine;
     const tabs = ['All'].concat(Object.keys(P.SECTORS)).map(k => `<span class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-id="${k}">${k === 'All' ? 'All' : P.SECTORS[k].n}</span>`).join('');
-    const mineRows = all.filter(r => mine.has(r.id)).map(r => `${esc(r.u)} ${r.sc}`).join(' · ');
+    const mineRows = Object.keys(pub).filter(id => mine.has(id)).map(id => pub[id]).map(r => r.done ? `${esc(r.u)} ${r.sc}` : (r.dq || isDQ(r)) ? `${esc(r.u)} disqualified` : `${esc(r.u)} in progress`).join(' · ');
     return `${head('<span class="live">LIVE</span>')}<h2>Leaderboard</h2><div class="tabs">${tabs}</div>${lbHTML(list, mine, 40)}${mineRows ? `<p style="text-align:center;margin-top:10px;font-size:13px">Your scores: ${mineRows}</p>` : ''}<p style="text-align:center;margin-top:8px;font-size:12.5px">Updates live. Come back any time and log in.</p><div class="gap"></div>${state.open && cur ? '<button class="go gold" data-act="again">PLAY AGAIN ▶</button>' : !cur ? '<button class="go" data-act="home">BACK ▶</button>' : '<p style="text-align:center">The event is closed. Thanks for playing.</p>'}`;
   }
+  const vDq = () => `${brand}<h2>Game ended</h2><p style="margin-top:8px">The game was not finished within 15 minutes, so it was disqualified and is not on the leaderboard.</p><p style="margin-top:8px">You are welcome to start again from the beginning.</p><div class="gap"></div><button class="go gold" data-act="again">START AGAIN ▶</button><div class="link" data-act="login">See my scores</div>`;
   function vLogin() {
     const f = ui.form;
     return `${brand}<h2>See your scores</h2><p>Use the email and phone you registered with.</p><div class="in" style="margin-top:14px"><label>WORK EMAIL</label><input data-f="lemail" type="email" autocomplete="off" value="${esc(f.lemail || '')}"></div><div class="in"><label>LAST 4 DIGITS OF YOUR PHONE</label><input data-f="lp4" autocomplete="off" inputmode="numeric" maxlength="4" value="${esc(f.lp4 || '')}"></div><div class="err" id="err">${esc(ui.err)}</div><div class="gap"></div><button class="go" data-act="dologin">SHOW ME ▶</button><div class="link" data-act="home">Back</div>`;
@@ -92,7 +94,7 @@
     if (s === 'boot') h = '<div class="boot">Loading…</div>';
     else if (s === 'closed') h = vClosed(); else if (s === 'details') h = vDetails(); else if (s === 'sector') h = vSector(); else if (s === 'usecase') h = vUse();
     else if (s === 'r1') h = vShop(1); else if (s === 'r2') h = vShop(2); else if (s === 'att1') h = vAttack(1); else if (s === 'att2') h = vAttack(2);
-    else if (s === 'score') h = vScore(); else if (s === 'board') h = vBoard(); else if (s === 'login') h = vLogin();
+    else if (s === 'dq') h = vDq(); else if (s === 'score') h = vScore(); else if (s === 'board') h = vBoard(); else if (s === 'login') h = vLogin();
     $app.innerHTML = `<div class="ph">${h}${DB.mode === 'demo' ? '<p style="text-align:center;font-size:11px;margin-top:8px">DEMO MODE</p>' : ''}</div>`;
     if (!force) window.scrollTo(0, y); else if (s === 'att1' || s === 'att2') runAttacks(s === 'att1' ? 1 : 2);
     if (force) { bedOn(); if (s === 'r1' || s === 'r2') { ui.dealt = s === 'r1' ? 1 : 2; sfx('horn'); } if (s === 'score') scoreFx(); }
@@ -136,6 +138,8 @@
     try {
       const o = await DB.get(BASE + '/state'); state = o || state; if (!state.open) { ui.busy = 0; return go('closed'); }
       const f = ui.form, u = clean(f.u), id = 'p' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4), k = keyOf(u);
+      const ow = await DB.get(BASE + '/names/' + k);
+      if (ow && ow !== id) { const op = await DB.get(BASE + '/pub/' + ow); if (isDQ(op) || (op && op.dq)) await DB.set(BASE + '/names/' + k, null); }
       await DB.tx(BASE + '/names/' + k, c => c ? undefined : id);
       if ((await DB.get(BASE + '/names/' + k)) !== id) { ui.err = 'That username is taken. Please pick another.'; ui.busy = 0; return render(true); }
       const email = String(f.email).trim().toLowerCase(), digits = String(f.phone).replace(/\D/g, '');
@@ -162,6 +166,7 @@
     ui.subm = 0; if (auto) toast('Time is up. Round submitted.'); go(r === 1 ? 'att1' : 'att2');
   }
   const confirm0 = () => true;
+  async function markDQ(p) { try { cur = p; p.dq = 1; await DB.set(BASE + '/priv/' + p.id, p); await DB.set(BASE + '/pub/' + p.id, { u: p.u, s: p.sector || '', sc: 0, done: 0, dq: 1, t: p.t0 }); } catch (e) {} store.set(PIDK, ''); cur = null; sfx('sad'); go('dq'); }
   async function login() {
     const em = String(ui.form.lemail || '').trim().toLowerCase(), p4 = String(ui.form.lp4 || '').replace(/\D/g, '').slice(-4);
     if (!em || p4.length < 4) { ui.err = 'Enter your email and the last 4 digits of your phone.'; return render(true); }
@@ -183,7 +188,7 @@
   function bind() {
     $app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (!el) return; e.stopPropagation(); const f = A[el.dataset.act]; if (f) f(el); });
     $app.addEventListener('input', e => { const k = e.target.dataset && e.target.dataset.f; if (!k) return; ui.form[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value; });
-    setInterval(() => { if (!cur || !(ui.screen === 'r1' || ui.screen === 'r2')) return; const t = document.getElementById('tm'), ms = remain(); if (t) { t.textContent = '⏱ ' + fmtT(ms); t.classList.toggle('low', ms < 15000); const sc = Math.ceil(ms / 1000); if (sc <= 10 && sc > 0 && sc !== ui.lastTick) { ui.lastTick = sc; sfx('tick'); } const cl = document.getElementById('cl'); } if (ms <= 0) submitRound(true); }, 250);
+    setInterval(() => { if (cur && !cur.done && ui.screen !== 'dq' && ui.screen !== 'score' && ui.screen !== 'board' && ui.screen !== 'login' && DB.now() > cur.t0 + DQ_MS) { markDQ(cur); return; } if (!cur || !(ui.screen === 'r1' || ui.screen === 'r2')) return; const t = document.getElementById('tm'), ms = remain(); if (t) { t.textContent = '⏱ ' + fmtT(ms); t.classList.toggle('low', ms < 15000); const sc = Math.ceil(ms / 1000); if (sc <= 10 && sc > 0 && sc !== ui.lastTick) { ui.lastTick = sc; sfx('tick'); } const cl = document.getElementById('cl'); } if (ms <= 0) submitRound(true); }, 250);
   }
   function resume(p) { p.r1 = p.r1 || {}; p.r2 = p.r2 || {}; p.b1 = p.b1 || 0; p.b2 = p.b2 || 0; cur = p; if (p.done) return 'score'; if (p.r2s) return ui.animDone[p.id + 1] || 1 ? 'r2' : 'r2'; if (p.r1e) return 'att1'; if (p.r1s) return 'r1'; return p.sector ? 'usecase' : 'sector'; }
   async function player() {
@@ -192,6 +197,7 @@
     const id = store.get(PIDK); let p = id ? await DB.get(BASE + '/priv/' + id) : null; const s = await DB.get(BASE + '/state'); state = s || { open: false };
     ui.form = {};
     if (p && p.done) { store.set(PIDK, ''); p = null; }
+    if (p && !p.done && DB.now() > p.t0 + DQ_MS) { await markDQ(p); return; }
     if (p) { p.r1 = p.r1 || {}; p.r2 = p.r2 || {}; p.b1 = p.b1 || 0; p.b2 = p.b2 || 0; }
     if (p) { const sc = resume(p); if (sc === 'att1' && !p.r2s) { ui.animDone[p.id + 1] = 1; } if (!p.done && p.r2s && remain0(p) <= 0) { ui.screen = 'r2'; cur = p; await submitRound(true); return; } if (!p.done && p.r1s && !p.r1e && remain1(p) <= 0 && sc === 'r1') { cur = p; ui.screen = 'r1'; await submitRound(true); return; } if (sc === 'att1') ui.animDone[p.id + 1] = 1; return go(sc); }
     go(state.open ? 'details' : 'closed');
@@ -202,10 +208,10 @@
   function qrSVG(text) { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 8, margin: 0, scalable: true }); }
   function host() {
     $app.innerHTML = '<div class="ph wide"><div class="boot">Loading…</div></div>';
-    const draw = () => { const all = Object.keys(pub).map(id => pub[id]), done = all.filter(x => x.done).length, url = playURL(), burl = url + (url.includes('?') ? '&' : '?') + 'board';
+    const draw = () => { const all = Object.keys(pub).map(id => pub[id]), done = all.filter(x => x.done).length, dq = all.filter(x => !x.done && (x.dq || isDQ(x))).length, url = playURL(), burl = url + (url.includes('?') ? '&' : '?') + 'board';
       $app.innerHTML = `<div class="ph wide"><div class="brand">HOST · PROXIMUS × INFOSYS</div><h1>Defend the agent</h1>
       <div class="hbox"><h3>EVENT</h3><div class="hbig">${state.open ? '🟢 OPEN' : '🔴 CLOSED'}</div><p>${state.open ? 'Players can register and play.' : 'Nobody can start a new game. Anyone mid-round finishes that round.'}</p><button class="hbtn ${state.open ? 'off' : 'on'}" data-act="toggle">${state.open ? 'CLOSE THE EVENT' : 'OPEN THE EVENT'}</button></div>
-      <div class="hbox"><h3>PLAYERS</h3><div class="hrow"><div><div class="hbig">${all.length}</div><p>started</p></div><div><div class="hbig">${done}</div><p>finished</p></div></div></div>
+      <div class="hbox"><h3>PLAYERS</h3><div class="hrow"><div><div class="hbig">${all.length}</div><p>started</p></div><div><div class="hbig">${done}</div><p>finished</p></div><div><div class="hbig">${all.length - done - dq}</div><p>playing now</p></div><div><div class="hbig">${dq}</div><p>disqualified (15 min)</p></div></div></div>
       <div class="hbox"><h3>TOP 10</h3>${lbHTML(rows(), new Set(), 10)}</div>
       <div class="hbox"><h3>EXPORT</h3><button class="hbtn n" data-act="csv">Download all plays (CSV)</button><button class="hbtn n" data-act="csv2">Download scores by person (CSV)</button><p id="xmsg" style="margin-top:6px"></p></div>
       <div class="hbox"><h3>LINKS</h3><div style="display:flex;gap:16px;align-items:center"><div class="qr">${qrSVG(url)}</div><div style="line-height:1.9;font-size:14px">Players: <a style="color:var(--cy)" href="${esc(url)}" target="_blank">${esc(url)}</a><br>Projector: <a style="color:var(--cy)" href="${esc(burl)}" target="_blank">${esc(burl)}</a></div></div></div></div>`; };
@@ -216,7 +222,7 @@
     $app.addEventListener('click', async e => { const el = e.target.closest('[data-act]'); if (!el) return; const a = el.dataset.act;
       if (a === 'toggle') { if (state.open && !window.confirm('Close the event? Nobody can start a new game.')) return; await DB.set(BASE + '/state', { open: !state.open, at: DB.now() }); }
       if (a === 'csv' || a === 'csv2') { const m = document.getElementById('xmsg'); m.textContent = 'Preparing…'; try { const ps = await fetchAll(); const ev = ps.map(p => Object.assign({ p }, P.evaluate(p)));
-        if (a === 'csv') dl('proximus-infy-plays.csv', ['Username,Name,Phone,Email,Company,Sector,Status,Round 1 %,Round 2 %,Extra coin buys,Score,Started'].concat(ev.map(x => [x.p.u, x.p.name, x.p.phone, x.p.email, x.p.company, (P.SECTORS[x.p.sector] || {}).n || '', x.p.done ? 'finished' : 'incomplete', pc(x.avg1), pc(x.avg2), x.buys, x.p.done ? x.score : '', new Date(x.p.t0).toISOString()].map(csvq).join(','))).join('\n'));
+        if (a === 'csv') dl('proximus-infy-plays.csv', ['Username,Name,Phone,Email,Company,Sector,Status,Round 1 %,Round 2 %,Extra coin buys,Score,Started'].concat(ev.map(x => [x.p.u, x.p.name, x.p.phone, x.p.email, x.p.company, (P.SECTORS[x.p.sector] || {}).n || '', x.p.done ? 'finished' : (x.p.dq || DB.now() > x.p.t0 + DQ_MS) ? 'disqualified' : 'in progress', pc(x.avg1), pc(x.avg2), x.buys, x.p.done ? x.score : '', new Date(x.p.t0).toISOString()].map(csvq).join(','))).join('\n'));
         else { const by = {}; ev.forEach(x => { const k = x.p.email; (by[k] = by[k] || { name: x.p.name, company: x.p.company, list: [] }).list.push(x); });
           dl('proximus-infy-by-person.csv', ['Email,Name,Company,Plays,Best score,All scores (username: score)'].concat(Object.keys(by).map(k => { const b = by[k], l = b.list.filter(x => x.p.done); return [k, b.name, b.company, l.length, l.length ? Math.max(...l.map(x => x.score)) : '', l.map(x => x.p.u + ': ' + x.score).join('; ')].map(csvq).join(','); })).join('\n')); }
         m.textContent = ps.length + ' plays exported.'; } catch (err) { m.textContent = 'Could not read player details with the current database rules. Use Firebase console → Export JSON.'; } } });
