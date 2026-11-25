@@ -49,10 +49,10 @@
     const f = ui.form, v = k => esc(f[k] || '');
     return `${brand}<h1>Defend the<br>agent</h1><p>Two rounds. Two minutes each. Beat the other players.</p>
     <div class="in hero" style="margin-top:12px"><label>USERNAME · SHOWN ON THE LEADERBOARD</label><input data-f="u" maxlength="16" autocomplete="off" value="${v('u')}" placeholder="Pick a username"></div>
-    <div class="in"><label>FULL NAME</label><input data-f="name" autocomplete="name" value="${v('name')}"></div>
-    <div class="in"><label>PHONE</label><input data-f="phone" type="tel" autocomplete="tel" value="${v('phone')}"></div>
-    <div class="in"><label>WORK EMAIL</label><input data-f="email" type="email" autocomplete="email" value="${v('email')}"></div>
-    <div class="in"><label>COMPANY</label><input data-f="company" autocomplete="organization" value="${v('company')}"></div>
+    <div class="in"><label>FULL NAME</label><input data-f="name" autocomplete="off" value="${v('name')}"></div>
+    <div class="in"><label>PHONE</label><input data-f="phone" type="tel" autocomplete="off" value="${v('phone')}"></div>
+    <div class="in"><label>WORK EMAIL</label><input data-f="email" type="email" autocomplete="off" value="${v('email')}"></div>
+    <div class="in"><label>COMPANY</label><input data-f="company" autocomplete="off" value="${v('company')}"></div>
     <label class="chk"><input type="checkbox" data-f="ok" ${f.ok ? 'checked' : ''}><span>I agree that Proximus and Infosys may email me my results and the best strategy.</span></label>
     <div class="err" id="err">${esc(ui.err)}</div><div class="gap"></div><button class="go" data-act="details">NEXT ▶</button><div class="link" data-act="login">Already played? See your scores</div>`;
   }
@@ -85,7 +85,7 @@
   }
   function vLogin() {
     const f = ui.form;
-    return `${brand}<h2>See your scores</h2><p>Use the email and phone you registered with.</p><div class="in" style="margin-top:14px"><label>WORK EMAIL</label><input data-f="lemail" type="email" value="${esc(f.lemail || '')}"></div><div class="in"><label>LAST 4 DIGITS OF YOUR PHONE</label><input data-f="lp4" inputmode="numeric" maxlength="4" value="${esc(f.lp4 || '')}"></div><div class="err" id="err">${esc(ui.err)}</div><div class="gap"></div><button class="go" data-act="dologin">SHOW ME ▶</button><div class="link" data-act="home">Back</div>`;
+    return `${brand}<h2>See your scores</h2><p>Use the email and phone you registered with.</p><div class="in" style="margin-top:14px"><label>WORK EMAIL</label><input data-f="lemail" type="email" autocomplete="off" value="${esc(f.lemail || '')}"></div><div class="in"><label>LAST 4 DIGITS OF YOUR PHONE</label><input data-f="lp4" autocomplete="off" inputmode="numeric" maxlength="4" value="${esc(f.lp4 || '')}"></div><div class="err" id="err">${esc(ui.err)}</div><div class="gap"></div><button class="go" data-act="dologin">SHOW ME ▶</button><div class="link" data-act="home">Back</div>`;
   }
   function render(force) {
     const y = window.scrollY, s = ui.screen; let h = '';
@@ -141,7 +141,7 @@
       const email = String(f.email).trim().toLowerCase(), digits = String(f.phone).replace(/\D/g, '');
       cur = { id, u, name: String(f.name).trim(), phone: String(f.phone).trim(), p4: digits.slice(-4), email, company: String(f.company).trim(), sector: '', seed: 1 + Math.floor(Math.random() * 1e9), t0: DB.now(), r1: {}, r2: {}, b1: 0, b2: 0, done: 0 };
       await saveNow(); await DB.set(BASE + '/pub/' + id, { u, s: '', sc: 0, done: 0, t: cur.t0 }); await DB.set(BASE + '/ix/' + h53(email) + '/' + id, 1);
-      store.set(PIDK, id); store.set(PROF, JSON.stringify({ name: cur.name, phone: cur.phone, email, company: cur.company })); ui.busy = 0; go('sector');
+      store.set(PIDK, id);  ui.busy = 0; go('sector');
     } catch (err) { ui.busy = 0; ui.err = 'Could not connect. Please try again.'; render(true); }
   }
   function add(id) {
@@ -168,17 +168,17 @@
     try { const ix = await DB.get(BASE + '/ix/' + h53(em)) || {}, ok = new Set();
       for (const id of Object.keys(ix)) { const p = await DB.get(BASE + '/priv/' + id); if (p && p.p4 === p4) ok.add(id); }
       if (!ok.size) { ui.err = 'We could not find a game with those details.'; return render(true); }
-      ui.mine = ok; ui.tab = 'All'; go('board'); } catch (e) { ui.err = 'Could not connect. Please try again.'; render(true); }
+      ui.mine = ok; ui.tab = 'All'; ui.form = {}; cur = null; go('board'); } catch (e) { ui.err = 'Could not connect. Please try again.'; render(true); }
   }
   const A = {
-    details: doDetails, login: () => { ui.form = Object.assign({}, ui.form); go('login'); }, dologin: login, home: () => go(cur && !cur.done && cur.r1s ? 'r1' : (state.open ? 'details' : 'closed')),
+    details: doDetails, login: () => { ui.form = {}; go('login'); }, dologin: login, home: () => { ui.form = {}; ui.mine = new Set(); go(cur && !cur.done && cur.r1s ? 'r1' : (state.open ? 'details' : 'closed')); },
     sector(el) { cur.sector = el.dataset.id; save(); DB.set(BASE + '/pub/' + cur.id, { u: cur.u, s: cur.sector, sc: 0, done: 0, t: cur.t0 }); go('usecase'); },
     async start1() { const o = await DB.get(BASE + '/state'); state = o || state; if (!state.open && !cur.r1s) return go('closed'); if (!cur.r1s) cur.r1s = DB.now(); await saveNow(); go('r1'); },
     add: el => add(el.dataset.id), sub: el => sub(el.dataset.id), buy, submit: () => submitRound(false),
     async start2() { if (!cur.r2s) cur.r2s = DB.now(); await saveNow(); go('r2'); }, score: () => go('score'), board() { ui.mine = new Set([cur.id]); ui.tab = 'All'; go('board'); },
     mute() { store.set('px_mute', muted() ? '0' : '1'); bedOn(); render(); },
     tab(el) { ui.tab = el.dataset.id; render(); },
-    again() { const p = prof(); ui.form = { name: p.name, phone: p.phone, email: p.email, company: p.company, u: '', ok: 1 }; cur = null; store.set(PIDK, ''); go('details'); },
+    again() { ui.form = {}; ui.mine = new Set(); cur = null; store.set(PIDK, ''); go('details'); },
   };
   function bind() {
     $app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (!el) return; e.stopPropagation(); const f = A[el.dataset.act]; if (f) f(el); });
@@ -190,7 +190,8 @@
     bind(); DB.on(BASE + '/state', v => { const was = state.open; state = v || { open: false }; if (state.open !== was && (ui.screen === 'closed' || ui.screen === 'boot')) { if (ui.screen === 'closed' && state.open) go('details'); } });
     DB.on(BASE + '/pub', v => { pub = v || {}; if (ui.screen === 'board' || ui.screen === 'score') { if (ui.screen === 'board') render(); else { const e = document.querySelector('.row3 .pill:last-child'); if (e) { const l = rows(), rk = l.findIndex(x => x.id === cur.id) + 1; e.textContent = rk ? '#' + rk + ' / ' + l.length : '…'; } } } });
     const id = store.get(PIDK); let p = id ? await DB.get(BASE + '/priv/' + id) : null; const s = await DB.get(BASE + '/state'); state = s || { open: false };
-    const pr = prof(); ui.form = { name: pr.name, phone: pr.phone, email: pr.email, company: pr.company, ok: pr.email ? 1 : 0 };
+    ui.form = {};
+    if (p && p.done) { store.set(PIDK, ''); p = null; }
     if (p) { const sc = resume(p); if (sc === 'att1' && !p.r2s) { ui.animDone[p.id + 1] = 1; } if (!p.done && p.r2s && remain0(p) <= 0) { ui.screen = 'r2'; cur = p; await submitRound(true); return; } if (!p.done && p.r1s && !p.r1e && remain1(p) <= 0 && sc === 'r1') { cur = p; ui.screen = 'r1'; await submitRound(true); return; } if (sc === 'att1') ui.animDone[p.id + 1] = 1; return go(sc); }
     go(state.open ? 'details' : 'closed');
   }
