@@ -55,7 +55,7 @@
   }
   const vSector = () => `${brand}<h2>Choose your sector</h2><p>You will protect an AI agent from that world.</p><div style="margin-top:10px">${Object.keys(P.SECTORS).map(k => { const s = P.SECTORS[k]; return `<div class="sec ${cur.sector === k ? 'on' : ''}" data-act="sector" data-id="${k}"><span class="o">${s.e}</span><div>${s.n}<small>${s.sub}</small></div></div>`; }).join('')}</div>`;
   function vUse() { const s = P.SECTORS[cur.sector]; return `${brand}${arena('lg')}<div class="kick" style="text-align:center">YOUR AGENT · ${s.n.toUpperCase()}</div><h2 style="text-align:center">${s.agent}</h2><p style="text-align:center">${s.t}</p>
-    <p style="margin-top:12px;text-align:center"><b style="color:#fff">DEFCON 3, then DEFCON 5 · 3 random attacks in total</b><br><span style="font-size:12px">DEFCON = Defense Readiness Condition</span><br>Buy defences with your coins. Survive. Upgrade. Survive harder.</p><p style="margin-top:8px;text-align:center">⏱ <b style="color:var(--gold)">2:00</b> per round, or tap Submit when ready.</p>${legend()}<div class="gap"></div><button class="go gold" data-act="start1">ENTER DEFCON 3 ▶</button>`; }
+    <p style="margin-top:12px;text-align:center"><b style="color:#fff">DEFCON 3, then DEFCON 5 · 3 to 5 random attacks</b><br><span style="font-size:12px">DEFCON = Defense Readiness Condition</span><br>Buy defences with your coins. Survive. Upgrade. Survive harder.</p><p style="margin-top:8px;text-align:center">⏱ <b style="color:var(--gold)">2:00</b> per round, or tap Submit when ready.</p>${legend()}<div class="gap"></div><button class="go gold" data-act="start1">ENTER DEFCON 3 ▶</button>`; }
   /* ---------- ring shop ---------- */
   const LC = ['#2a3560', '#2be0ff', '#3dffb0', '#ffcf4d'], LNm = ['', 'Light', 'Strong', 'Very strong'];
   const ell = (n, rx, ry, cx, cy) => Array.from({ length: n }, (_, i) => { const a = (-90 + i * 360 / n) * Math.PI / 180; return [cx + rx * Math.cos(a), cy + ry * Math.sin(a)]; });
@@ -79,7 +79,7 @@
     return `<div class="topbar">${head(`<span class="pill">DEFCON ${dc}</span><span class="pill tm" id="tm">⏱ ${fmtT(remain())}</span><button class="pill mute" data-act="mute">${muted() ? '🔇' : '🔊'}</button>`)}
     <div class="coins"><span class="coin">${left}</span><div><b id="cl">${left}</b><small>coins left</small></div><button class="buy" id="buy" data-act="buy" ${buys >= P.MAX_EXTRA ? 'disabled' : ''}>+${P.EXTRA} COINS<small>costs −${P.EXTRA_PEN} points</small></button></div></div>${tabs}
     <div class="rg"><div class="el" style="width:74%;height:68%"></div><div class="el" style="width:49%;height:46%;opacity:.5"></div>${centreH()}${stage}</div>
-    <div class="tip">Tap <b>+</b> to buy a level, <b>−</b> to take it back. The arc fills as you add levels: <span style="color:#2be0ff">Light 50%</span> · <span style="color:#3dffb0">Strong 70%</span> · <span style="color:#ffcf4d">Very strong 100%</span>. Random attacks hit when you submit (3 in total across both DEFCONs).${buys ? ` Extra coin packs bought: ${buys}.` : ''}</div><div class="subw"><button class="go" data-act="submit">SUBMIT DEFCON ${dc} ▶</button></div>`;
+    <div class="tip">Tap <b>+</b> to buy a level, <b>−</b> to take it back. The arc fills as you add levels: <span style="color:#2be0ff">Light 50%</span> · <span style="color:#3dffb0">Strong 70%</span> · <span style="color:#ffcf4d">Very strong 100%</span>. 3 to 5 random attacks hit across the two DEFCONs, a different mix every play.${buys ? ` Extra coin packs bought: ${buys}.` : ''}</div><div class="subw"><button class="go" data-act="submit">SUBMIT DEFCON ${dc} ▶</button></div>`;
   }
   function vAttack(r) {
     const dc = r === 1 ? 3 : 5, res0 = P.evaluate(cur)['r' + r], nA = res0.length, off = r === 2 ? P.evaluate(cur).r1.length : 0;
@@ -141,20 +141,20 @@
     let i = 0;
     const step = () => {
       if (i >= res.length) { sfx('fanfare'); setTimeout(replay, 1300); return; }
-      const x = res[i], a = P.AT[x.a], k = off + i + 1, W = $a.clientWidth, H = $a.clientHeight, cx = W / 2, cy = 314;
+      const x = res[i], a = P.AT[x.a], k = off + i + 1, NT = P.split(cur.seed || 1).n, wk = Math.ceil(k * 3 / NT), W = $a.clientWidth, H = $a.clientHeight, cx = W / 2, cy = 314;
       setSp(i, 'now', 'Incoming', 'hits now');
-      $b.innerHTML = `<div class="abn s${k}"><div class="kk">ATTACK ${k} OF 3 · ${WNAME[k].toUpperCase()}</div><b>${a.e} ${a.n}</b><small>${esc(a.t)}</small></div>`; sfx('whoosh'); buzz(10);
-      const side = [-1, 1, 0][k - 1], sx = cx + side * W * .34, sy = 90, ang = Math.atan2(-(cx - sx), (cy - sy)) * 180 / Math.PI, w = WW[k], hh = w * (k === 1 ? 2 : k === 2 ? 2.33 : 1.78);
-      const m = document.createElement('div'); m.className = 'wp'; m.innerHTML = WEAPON[k](w); $a.appendChild(m);
-      const an = m.animate([{ left: sx + 'px', top: sy + 'px', transform: `translate(-50%,0) rotate(${ang}deg)`, opacity: 0 }, { opacity: 1, offset: .12 }, { left: cx + 'px', top: (cy - hh * .9) + 'px', transform: `translate(-50%,0) rotate(${ang}deg)`, opacity: 1 }], { duration: 1100 - k * 90, delay: 900, easing: 'ease-in', fill: 'forwards' });
+      $b.innerHTML = `<div class="abn s${wk}"><div class="kk">ATTACK ${k} OF ${NT} · ${WNAME[wk].toUpperCase()}</div><b>${a.e} ${a.n}</b><small>${esc(a.t)}</small></div>`; sfx('whoosh'); buzz(10);
+      const side = [-1, 1, 0][(k - 1) % 3], sx = cx + side * W * .34, sy = 90, ang = Math.atan2(-(cx - sx), (cy - sy)) * 180 / Math.PI, w = WW[wk], hh = w * (wk === 1 ? 2 : wk === 2 ? 2.33 : 1.78);
+      const m = document.createElement('div'); m.className = 'wp'; m.innerHTML = WEAPON[wk](w); $a.appendChild(m);
+      const an = m.animate([{ left: sx + 'px', top: sy + 'px', transform: `translate(-50%,0) rotate(${ang}deg)`, opacity: 0 }, { opacity: 1, offset: .12 }, { left: cx + 'px', top: (cy - hh * .9) + 'px', transform: `translate(-50%,0) rotate(${ang}deg)`, opacity: 1 }], { duration: 1100 - wk * 90, delay: 900, easing: 'ease-in', fill: 'forwards' });
       an.onfinish = () => {
         m.remove(); const hot = x.pct < .45;
-        const bl = document.createElement('div'); bl.className = 'blast'; bl.style.setProperty('--sz', [0, 120, 180, 260][k] + 'px'); bl.textContent = '💥'; $a.appendChild(bl); setTimeout(() => bl.remove(), 800);
+        const bl = document.createElement('div'); bl.className = 'blast'; bl.style.setProperty('--sz', [0, 120, 180, 260][wk] + 'px'); bl.textContent = '💥'; $a.appendChild(bl); setTimeout(() => bl.remove(), 800);
         const fx = document.createElement('div'); fx.className = 'fx ' + (hot ? 'hurt' : ''); $a.appendChild(fx); setTimeout(() => fx.remove(), 700);
-        $ph.classList.remove('s1', 's2', 's3'); void $ph.offsetWidth; $ph.classList.add('s' + k); setTimeout(() => $ph.classList.remove('s' + k), 800);
-        const v = document.createElement('div'); v.className = 'vig v' + k; document.body.appendChild(v); setTimeout(() => v.remove(), 900);
+        $ph.classList.remove('s1', 's2', 's3'); void $ph.offsetWidth; $ph.classList.add('s' + wk); setTimeout(() => $ph.classList.remove('s' + wk), 900);
+        const v = document.createElement('div'); v.className = 'vig v' + wk; document.body.appendChild(v); setTimeout(() => v.remove(), 900);
         const c = document.getElementById('ctr'); c.classList.add('hot'); setTimeout(() => c.classList.remove('hot'), 900);
-        sfx(x.pct >= .45 ? 'shield' : 'boom'); if (k > 1) setTimeout(() => sfx('boom'), 120); buzz(k === 1 ? 25 : k === 2 ? [40, 30, 50] : [70, 40, 90]);
+        sfx(x.pct >= .45 ? 'shield' : 'boom'); if (wk > 1) setTimeout(() => sfx('boom'), 120); buzz(wk === 1 ? 25 : wk === 2 ? [40, 30, 50] : [70, 40, 90]);
         x.by.forEach(id => { const e = $d.querySelector(`.dfi[data-id="${id}"]`); if (e) { e.classList.add('help'); setTimeout(() => e.classList.remove('help'), 1800); } });
         const st = document.createElement('div'); st.className = 'bstamp ' + cls(x.pct); st.innerHTML = `${pc(x.pct)}% BLOCKED`; $a.appendChild(st); setTimeout(() => st.remove(), 1700);
         setSp(i, 'ok ' + cls(x.pct), 'Blocked', pc(x.pct) + '%'); i++; setTimeout(() => { $b.innerHTML = ''; step(); }, 2100);

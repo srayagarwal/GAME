@@ -38,9 +38,10 @@
     health: { e: '🏥', n: 'Healthcare', sub: 'Scheduling and records', agent: 'Patient-ops agent', t: 'Books appointments and updates patient records on its own.' },
     energy: { e: '⚡', n: 'Energy', sub: 'Grid balancing', agent: 'Grid agent', t: 'Balances power supply and demand and switches assets on and off.' } };
   function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-  // 3 attacks in total across both DEFCONs: 1 or 2 in DEFCON 3 (random), the rest in DEFCON 5
-  const split = seed => rng(seed * 31 + 5)() < 0.5 ? 1 : 2;
-  function draw(seed, round) { const n1 = split(seed), n = round === 1 ? n1 : 3 - n1, r = rng(seed * 7 + round * 101), p = POOL[round].slice(), out = []; for (let i = 0; i < n; i++) out.push(p.splice(Math.floor(r() * p.length), 1)[0]); return out; }
+  // Random number of attacks per play: 3 to 5 in total across both DEFCONs, split between them (each gets at least 1)
+  const total = seed => 3 + Math.floor(rng(seed * 17 + 3)() * 3);
+  const split = seed => { const n = total(seed), lo = Math.floor(n / 2), n1 = rng(seed * 31 + 5)() < 0.5 ? lo : n - lo; return { n, n1, n2: n - n1 }; };
+  function draw(seed, round) { const sp = split(seed), n = round === 1 ? sp.n1 : sp.n2, r = rng(seed * 7 + round * 101), p = POOL[round].slice(), out = []; for (let i = 0; i < n; i++) out.push(p.splice(Math.floor(r() * p.length), 1)[0]); return out; }
   const lv = (a, b) => { const o = {}; Object.keys(a || {}).forEach(k => o[k] = a[k]); Object.keys(b || {}).forEach(k => o[k] = Math.min(3, (o[k] || 0) + b[k])); return o; };
   // Mitigation needs a scan: its level can never exceed the best scan level (Vulnerability scanning or AI vulnerability scanning)
   const scanLv = L => Math.max(L.SCAN || 0, L.AIS || 0);
@@ -57,5 +58,5 @@
     const buys = (p.b1 || 0) + (p.b2 || 0), pen = buys * EXTRA_PEN, base = Math.round(100 * avg * avg);
     return { r1, r2, avg1, avg2, avg, base, pen, buys, score: Math.max(0, base - pen) };
   }
-  window.PX = { BASE, LEVEL, LEVEL2, START1, START2, EXTRA, EXTRA_PEN, MAX_EXTRA, UPG, R1, R2, CARD, AT, POOL, SECTORS, draw, split, lv, scanLv, capMit, block, cost1, cost2, coins, evaluate };
+  window.PX = { BASE, LEVEL, LEVEL2, START1, START2, EXTRA, EXTRA_PEN, MAX_EXTRA, UPG, R1, R2, CARD, AT, POOL, SECTORS, draw, split, total, lv, scanLv, capMit, block, cost1, cost2, coins, evaluate };
 })();
