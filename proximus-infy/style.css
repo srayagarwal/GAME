@@ -114,3 +114,5 @@ h1{background:linear-gradient(90deg,#fff,#b9a3ff 50%,#2be0ff);-webkit-background
 
 .lvls{display:grid;gap:6px;margin:12px 0 4px}.lvls div{display:flex;align-items:center;gap:10px;border-radius:12px;padding:7px 10px;background:#ffffff0d;border-left:4px solid var(--c)}
 .lvls b{font:900 11.5px Manrope,Arial,sans-serif;letter-spacing:.08em;color:var(--c);flex:none;min-width:132px}.lvls span{font:600 12px/1.3 Manrope,Arial,sans-serif;color:var(--mut)}
+
+.card.needscan{opacity:.55;filter:saturate(.4)}.card.needscan .pw{color:#ff9aa8}

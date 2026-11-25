@@ -41,9 +41,10 @@
   const brand = '<div class="brand">● ● PROXIMUS × INFOSYS</div>';
   const LVN = ['', 'LIGHT', 'STRONG', 'VERY STRONG'];
   const tok = (id, lvl, price, o = {}) => { const c = P.CARD[id], idx = o.i || 0, lock = o.lockMin != null && lvl <= o.lockMin;
-    return `<div class="card l${lvl} ${o.fresh ? 'fresh' : ''} ${o.deal ? 'deal' : ''}" style="--d:${idx * 55}ms" data-act="add" data-id="${id}">${o.nw ? '<span class="nw">NEW</span>' : ''}
+    const sl = id === 'MIT' && cur ? P.scanLv(P.lv(cur.r1, cur.r2)) : -1, need = sl === 0, capTxt = sl > 0 && lvl >= sl && lvl < 3 ? `MAX ${LVN[sl]} · YOUR SCAN` : '';
+    return `<div class="card l${lvl} ${o.fresh ? 'fresh' : ''} ${o.deal ? 'deal' : ''} ${need ? 'needscan' : ''}" style="--d:${idx * 55}ms" data-act="add" data-id="${id}">${o.nw ? '<span class="nw">NEW</span>' : ''}
       <div class="gem">${lvl >= 3 ? 'MAX' : price}</div><div class="art">${c.e}</div><div class="cn">${esc(c.n)}</div><div class="ce">${esc(c.s)}</div>
-      <div class="stars"><i>★</i><i>★</i><i>★</i></div><div class="pw">${lvl ? LVN[lvl] + ' · ' + Math.round(P.LEVEL[lvl] * 100) + '%' : 'NOT BOUGHT'}</div>
+      <div class="stars"><i>★</i><i>★</i><i>★</i></div><div class="pw">${need ? '🔒 NEEDS A SCAN FIRST' : capTxt || (lvl ? LVN[lvl] + ' · ' + Math.round(P.LEVEL[lvl] * 100) + '%' : 'NOT BOUGHT')}</div>
       <div class="ctl"><button class="cb m" data-act="sub" data-id="${id}" ${(lvl && !lock) ? '' : 'disabled'}>${lock && lvl ? '🔒' : '−'}</button><button class="cb p" data-act="add" data-id="${id}" ${lvl >= 3 ? 'disabled' : ''}>BUY</button></div></div>`; };
   const legend = () => `<div class="lvls"><div style="--c:#2be0ff"><b>● LIGHT · 50%</b><span>of the attack it covers is stopped</span></div><div style="--c:#3dffb0"><b>● STRONG · 70%</b><span>of the attack it covers is stopped</span></div><div style="--c:#ffcf4d"><b>● VERY STRONG · 100%</b><span>of the attack it covers is stopped</span></div></div>`;
   function vClosed() { return `${brand}<h1>Opening soon</h1><p>The game is not open right now. This page opens by itself when the host starts it.</p><div class="gap"></div><div class="link" data-act="login">Already played? See your scores</div>`; }
@@ -154,10 +155,13 @@
     if (r === 1 && c.r === 2) return; const have = (cur.r1[id] || 0) + (cur.r2[id] || 0);
     const bad = () => { sfx('deny'); const el = document.querySelector(`.tok[data-id="${id}"]`); el && (el.classList.add('shake'), setTimeout(() => el.classList.remove('shake'), 400)); buzz(30); };
     if (have >= 3) { toast('Already at the maximum level'); return bad(); }
+    if (id === 'MIT') { const sl = P.scanLv(P.lv(cur.r1, cur.r2)); if (!sl) { toast('Mitigation needs a scan first: buy a scanning card'); return bad(); } if (have >= sl) { toast('Mitigation cannot be stronger than your scan. Upgrade your scan first'); return bad(); } }
     if (left < price) { toast(`You need ${price - left} more coins`); const b = document.getElementById('buy'); b && (b.classList.remove('pulse'), void b.offsetWidth, b.classList.add('pulse')); return bad(); }
     const sel = r === 1 ? cur.r1 : cur.r2; sel[id] = (sel[id] || 0) + 1; sfx('chip'); buzz(10); save(); render();
   }
-  function sub(id) { const sel = ui.screen === 'r2' ? cur.r2 : cur.r1; if (!sel[id]) return; sel[id]--; if (!sel[id]) delete sel[id]; sfx('undo'); save(); render(); }
+  function sub(id) { const sel = ui.screen === 'r2' ? cur.r2 : cur.r1; if (!sel[id]) return; sel[id]--; if (!sel[id]) delete sel[id];
+    if (cur.r2.MIT) { const m = Math.min(cur.r2.MIT, P.scanLv(P.lv(cur.r1, cur.r2))); if (m < cur.r2.MIT) { toast('Mitigation lowered: it cannot be stronger than your scan'); if (m) cur.r2.MIT = m; else delete cur.r2.MIT; } }
+    sfx('undo'); save(); render(); }
   function buy() { const r = ui.screen === 'r2' ? 2 : 1, buys = (cur.b1 || 0) + (cur.b2 || 0); if (buys >= P.MAX_EXTRA) return; cur['b' + r] = (cur['b' + r] || 0) + 1; sfx('coin'); toast(`+${P.EXTRA} coins, −${P.EXTRA_PEN} points`); save(); render(); }
   async function submitRound(auto) {
     if (ui.subm) return; const r = round(); if (!auto && !confirm0()) return; ui.subm = 1;
