@@ -1,6 +1,6 @@
 /* Defend the Agent · rules. Cards can be bought up to 3 times: level 1 light, 2 strong, 3 very strong. */
 (function () {
-  const LEVEL = [0, 0.55, 0.80, 0.92], LEVEL2 = [0, 0.65, 0.88, 0.96], CAP = 0.95, SECOND = 0.75, BASE = 0.30;
+  const LEVEL = [0, 0.50, 0.70, 1.0], LEVEL2 = [0, 0.50, 0.70, 1.0], CAP = 1.0, SECOND = 0.75, BASE = 0.30;
   const START1 = 240, START2 = 150, EXTRA = 60, EXTRA_PEN = 6, MAX_EXTRA = 3, UPG = 10;
   // [id, emoji, name, short, price]
   const R1 = [
@@ -36,7 +36,7 @@
   function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function draw(seed, round) { const r = rng(seed * 7 + round * 101), p = POOL[round].slice(), out = []; for (let i = 0; i < 3; i++) out.push(p.splice(Math.floor(r() * p.length), 1)[0]); return out; }
   const lv = (a, b) => { const o = {}; Object.keys(a || {}).forEach(k => o[k] = a[k]); Object.keys(b || {}).forEach(k => o[k] = Math.min(3, (o[k] || 0) + b[k])); return o; };
-  function block(aid, levels) { let miss = 1 - BASE; const by = [], gap = []; Object.keys(AT[aid].c).forEach(cid => { const l = levels[cid] || 0, w = AT[aid].c[cid]; if (l) { miss *= 1 - Math.min(0.95, (CARD[cid].r === 2 ? LEVEL2 : LEVEL)[l] * w); by.push(cid); } else if (w >= 1 || CARD[cid].r === AT[aid].r) gap.push(cid); }); return { pct: Math.min(CAP, 1 - miss), by, gap }; }
+  function block(aid, levels) { let miss = 1 - BASE; const by = [], gap = []; Object.keys(AT[aid].c).forEach(cid => { const l = levels[cid] || 0, w = AT[aid].c[cid]; if (l) { miss *= 1 - Math.min(1, (CARD[cid].r === 2 ? LEVEL2 : LEVEL)[l] * w); by.push(cid); } else if (w >= 1 || CARD[cid].r === AT[aid].r) gap.push(cid); }); return { pct: Math.min(CAP, 1 - miss), by, gap }; }
   function cost1(sel) { return Object.keys(sel || {}).reduce((s, k) => s + sel[k] * CARD[k].p, 0); }
   function cost2(add) { return Object.keys(add || {}).reduce((s, k) => s + add[k] * (CARD[k].p + (CARD[k].r === 1 ? UPG : 0)), 0); }
   function coins(p) { p = Object.assign({}, p, { r1: p.r1 || {}, r2: p.r2 || {} }); const c1 = START1 + EXTRA * (p.b1 || 0) - cost1(p.r1); const c2 = c1 + START2 + EXTRA * (p.b2 || 0) - cost2(p.r2); return { c1, c2 }; }

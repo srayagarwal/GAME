@@ -45,7 +45,7 @@
       <div class="gem">${lvl >= 3 ? 'MAX' : price}</div><div class="art">${c.e}</div><div class="cn">${esc(c.n)}</div><div class="ce">${esc(c.s)}</div>
       <div class="stars"><i>★</i><i>★</i><i>★</i></div><div class="pw">${lvl ? LVN[lvl] + ' · ' + Math.round(P.LEVEL[lvl] * 100) + '%' : 'NOT BOUGHT'}</div>
       <div class="ctl"><button class="cb m" data-act="sub" data-id="${id}" ${(lvl && !lock) ? '' : 'disabled'}>${lock && lvl ? '🔒' : '−'}</button><button class="cb p" data-act="add" data-id="${id}" ${lvl >= 3 ? 'disabled' : ''}>BUY</button></div></div>`; };
-  const legend = () => `<div class="lvls"><div style="--c:#2be0ff"><b>● LIGHT</b><span>stops about half of an attack it covers</span></div><div style="--c:#3dffb0"><b>● STRONG</b><span>stops about 4 in 5</span></div><div style="--c:#ffcf4d"><b>● VERY STRONG</b><span>stops nearly all</span></div></div>`;
+  const legend = () => `<div class="lvls"><div style="--c:#2be0ff"><b>● LIGHT · 50%</b><span>of the attack it covers is stopped</span></div><div style="--c:#3dffb0"><b>● STRONG · 70%</b><span>of the attack it covers is stopped</span></div><div style="--c:#ffcf4d"><b>● VERY STRONG · 100%</b><span>of the attack it covers is stopped</span></div></div>`;
   function vClosed() { return `${brand}<h1>Opening soon</h1><p>The game is not open right now. This page opens by itself when the host starts it.</p><div class="gap"></div><div class="link" data-act="login">Already played? See your scores</div>`; }
   function vDetails() {
     const f = ui.form, v = k => esc(f[k] || '');
@@ -69,7 +69,7 @@
     ui.dealt = r;
     return `<div class="topbar">${head(`<span class="pill">ROUND ${r}/2</span><span class="pill tm" id="tm">⏱ ${fmtT(remain())}</span><button class="pill mute" data-act="mute">${muted() ? '🔇' : '🔊'}</button>`)}
     <div class="coins"><span class="coin">${left}</span><div><b id="cl">${left}</b><small>coins left</small></div><button class="buy" id="buy" data-act="buy" ${buys >= P.MAX_EXTRA ? 'disabled' : ''}>+${P.EXTRA} COINS<small>costs −${P.EXTRA_PEN} points</small></button></div></div>${arena('sm')}${dock}
-    <div class="tip"><span style="color:#2be0ff">● Light</span> &nbsp;<span style="color:#3dffb0">● Strong</span> &nbsp;<span style="color:#ffcf4d">● Very strong</span><br>Tap BUY to raise a level, − to take it back. 3 random attacks hit when you submit.${buys ? ` Extra coin packs bought: ${buys}.` : ''}</div><div class="subw"><button class="go" data-act="submit">SUBMIT ROUND ${r} ▶</button></div>`;
+    <div class="tip"><span style="color:#2be0ff">● Light</span> &nbsp;<span style="color:#3dffb0">● Strong</span> &nbsp;<span style="color:#ffcf4d">● Very strong</span><br>Light 50%, Strong 70%, Very strong 100%. Tap BUY to raise a level, − to take it back. 3 random attacks hit when you submit.${buys ? ` Extra coin packs bought: ${buys}.` : ''}</div><div class="subw"><button class="go" data-act="submit">SUBMIT ROUND ${r} ▶</button></div>`;
   }
   function vAttack(r) {
     return `${head(`<span class="pill">ROUND ${r}/2</span>`)}${arena('lg')}<div class="shotlbl" id="lbl"></div><div class="bar"><i id="bar" style="width:0"></i></div><div id="rows"></div><div class="gap"></div><button class="go gold" id="nx" data-act="${r === 1 ? 'start2' : 'score'}" disabled>${r === 1 ? 'ROUND 2 ▶' : 'SEE MY SCORE ▶'}</button>`;
