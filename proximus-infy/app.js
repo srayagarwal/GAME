@@ -45,10 +45,11 @@
       <div class="gem">${lvl >= 3 ? 'MAX' : price}</div><div class="art">${c.e}</div><div class="cn">${esc(c.n)}</div><div class="ce">${esc(c.s)}</div>
       <div class="stars"><i>★</i><i>★</i><i>★</i></div><div class="pw">${lvl ? LVN[lvl] + ' · ' + Math.round(P.LEVEL[lvl] * 100) + '%' : 'NOT BOUGHT'}</div>
       <div class="ctl"><button class="cb m" data-act="sub" data-id="${id}" ${(lvl && !lock) ? '' : 'disabled'}>${lock && lvl ? '🔒' : '−'}</button><button class="cb p" data-act="add" data-id="${id}" ${lvl >= 3 ? 'disabled' : ''}>BUY</button></div></div>`; };
+  const legend = () => `<div class="lvls"><div style="--c:#2be0ff"><b>● LIGHT</b><span>stops about half of an attack it covers</span></div><div style="--c:#3dffb0"><b>● STRONG</b><span>stops about 4 in 5</span></div><div style="--c:#ffcf4d"><b>● VERY STRONG</b><span>stops nearly all</span></div></div>`;
   function vClosed() { return `${brand}<h1>Opening soon</h1><p>The game is not open right now. This page opens by itself when the host starts it.</p><div class="gap"></div><div class="link" data-act="login">Already played? See your scores</div>`; }
   function vDetails() {
     const f = ui.form, v = k => esc(f[k] || '');
-    return `${brand}<h1>Defend the<br>agent</h1><p>Two rounds. Two minutes each. Beat the other players.</p>
+    return `${brand}<h1>Defend the<br>agent</h1><p>Two rounds. Two minutes each. Buy defences for your AI agent, then random attacks hit it. Beat the other players.</p>${legend()}
     <div class="in hero" style="margin-top:12px"><label>USERNAME · SHOWN ON THE LEADERBOARD</label><input data-f="u" maxlength="16" autocomplete="off" value="${v('u')}" placeholder="Pick a username"></div>
     <div class="in"><label>FULL NAME</label><input data-f="name" autocomplete="off" value="${v('name')}"></div>
     <div class="in"><label>PHONE</label><input data-f="phone" type="tel" autocomplete="off" value="${v('phone')}"></div>
@@ -59,7 +60,7 @@
   }
   const vSector = () => `${brand}<h2>Choose your sector</h2><p>You will protect an AI agent from that world.</p><div style="margin-top:10px">${Object.keys(P.SECTORS).map(k => { const s = P.SECTORS[k]; return `<div class="sec ${cur.sector === k ? 'on' : ''}" data-act="sector" data-id="${k}"><span class="o">${s.e}</span><div>${s.n}<small>${s.sub}</small></div></div>`; }).join('')}</div>`;
   function vUse() { const s = P.SECTORS[cur.sector]; return `${brand}${arena('lg')}<div class="kick" style="text-align:center">YOUR AGENT · ${s.n.toUpperCase()}</div><h2 style="text-align:center">${s.agent}</h2><p style="text-align:center">${s.t}</p>
-    <p style="margin-top:12px;text-align:center"><b style="color:#fff">2 rounds · 3 random attacks each</b><br>Buy defences with your coins. Survive. Upgrade. Survive harder.</p><p style="margin-top:8px;text-align:center">⏱ <b style="color:var(--gold)">2:00</b> per round, or tap Submit when ready.</p><div class="gap"></div><button class="go gold" data-act="start1">ENTER ROUND 1 ▶</button>`; }
+    <p style="margin-top:12px;text-align:center"><b style="color:#fff">2 rounds · 3 random attacks each</b><br>Buy defences with your coins. Survive. Upgrade. Survive harder.</p><p style="margin-top:8px;text-align:center">⏱ <b style="color:var(--gold)">2:00</b> per round, or tap Submit when ready.</p>${legend()}<div class="gap"></div><button class="go gold" data-act="start1">ENTER ROUND 1 ▶</button>`; }
   function vShop(r) {
     const co = P.coins(cur), left = r === 1 ? co.c1 : co.c2, buys = (cur.b1 || 0) + (cur.b2 || 0), dl = ui.dealt !== r; let dock;
     if (r === 1) dock = `<div class="hand">${P.R1.map((c, i) => tok(c[0], cur.r1[c[0]] || 0, c[4], { i, deal: dl })).join('')}</div>`;
