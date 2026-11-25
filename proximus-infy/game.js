@@ -1,6 +1,6 @@
 /* Defend the Agent · rules. Cards can be bought up to 3 times: level 1 light, 2 strong, 3 very strong. */
 (function () {
-  const LEVEL = [0, 0.55, 0.80, 0.92], CAP = 0.95, SECOND = 0.75, BASE = 0.30;
+  const LEVEL = [0, 0.55, 0.80, 0.92], LEVEL2 = [0, 0.65, 0.88, 0.96], CAP = 0.95, SECOND = 0.75, BASE = 0.30;
   const START1 = 240, START2 = 150, EXTRA = 60, EXTRA_PEN = 6, MAX_EXTRA = 3, UPG = 10;
   // [id, emoji, name, short, price]
   const R1 = [
@@ -20,12 +20,12 @@
     BAD: { e: '⚠️', n: 'Bad agent action', t: 'The agent takes a costly action nobody checked.', r: 1, c: { HIL: 1, HARN: SECOND, AUD: 0.3 } },
     KNOWN: { e: '🕳️', n: 'Known-flaw exploit', t: 'Attackers use a weakness that was already public.', r: 1, c: { SCAN: 1, LEP: SECOND } },
     AUDT: { e: '📋', n: 'Regulator audit', t: 'A regulator asks for proof of what the agent did.', r: 1, c: { AUD: 1, HIL: SECOND } },
-    JAIL: { e: '🔓', n: 'Jailbreak chain', t: 'A long conversation slowly talks the agent out of its limits.', r: 2, c: { RED: 1, SIM: 0.9, POL: SECOND, HARN2: SECOND } },
+    JAIL: { e: '🔓', n: 'Jailbreak chain', t: 'A long conversation slowly talks the agent out of its limits.', r: 2, c: { RED: 1, SIM: 0.9, POL: 0.5, HARN2: SECOND } },
     NOVEL: { e: '🌀', n: 'Novel attack', t: 'A new kind of attack nobody has seen before.', r: 2, c: { SIM: 1, RED: SECOND } },
     AIFLAW: { e: '⚡', n: 'AI-found flaw', t: 'An AI finds a flaw and exploits it in minutes.', r: 2, c: { AIS: 1, SIM: 1, MIT: SECOND } },
-    UNPATCH: { e: '🩸', n: 'Unpatched flaw', t: 'A known flaw has no fix yet and is being attacked.', r: 2, c: { MIT: 1, SIM: SECOND, SCAN: SECOND } },
-    IMPER: { e: '🥸', n: 'Agent impersonation', t: 'Someone pretends to be your agent to reach other systems.', r: 2, c: { AID: 1, LEP: SECOND } },
-    TOOLX: { e: '🛠️', n: 'Tool abuse', t: 'The agent is steered to misuse the powerful tools it can call.', r: 2, c: { HARN2: 1, KILL: SECOND, HARN: SECOND } } };
+    UNPATCH: { e: '🩸', n: 'Unpatched flaw', t: 'A known flaw has no fix yet and is being attacked.', r: 2, c: { MIT: 1, SIM: SECOND, SCAN: 0.5 } },
+    IMPER: { e: '🥸', n: 'Agent impersonation', t: 'Someone pretends to be your agent to reach other systems.', r: 2, c: { AID: 1, LEP: 0.5 } },
+    TOOLX: { e: '🛠️', n: 'Tool abuse', t: 'The agent is steered to misuse the powerful tools it can call.', r: 2, c: { HARN2: 1, KILL: 0.5, HARN: 0.5 } } };
   const POOL = { 1: ['INJ', 'LOOP', 'LEAK', 'DEEP', 'BAD', 'KNOWN', 'AUDT'], 2: ['JAIL', 'NOVEL', 'AIFLAW', 'UNPATCH', 'IMPER', 'TOOLX'] };
   const SECTORS = {
     telecom: { e: '📡', n: 'Telecom', sub: 'Network operations', agent: 'Network-ops agent', t: 'Spots faults in the network and fixes them alone: reroutes traffic, restarts services, pushes patches.' },
@@ -36,7 +36,7 @@
   function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function draw(seed, round) { const r = rng(seed * 7 + round * 101), p = POOL[round].slice(), out = []; for (let i = 0; i < 3; i++) out.push(p.splice(Math.floor(r() * p.length), 1)[0]); return out; }
   const lv = (a, b) => { const o = {}; Object.keys(a || {}).forEach(k => o[k] = a[k]); Object.keys(b || {}).forEach(k => o[k] = Math.min(3, (o[k] || 0) + b[k])); return o; };
-  function block(aid, levels) { let miss = 1 - BASE; const by = [], gap = []; Object.keys(AT[aid].c).forEach(cid => { const l = levels[cid] || 0, w = AT[aid].c[cid]; if (l) { miss *= 1 - Math.min(0.95, LEVEL[l] * w); by.push(cid); } else if (w >= 1 || CARD[cid].r === AT[aid].r) gap.push(cid); }); return { pct: Math.min(CAP, 1 - miss), by, gap }; }
+  function block(aid, levels) { let miss = 1 - BASE; const by = [], gap = []; Object.keys(AT[aid].c).forEach(cid => { const l = levels[cid] || 0, w = AT[aid].c[cid]; if (l) { miss *= 1 - Math.min(0.95, (CARD[cid].r === 2 ? LEVEL2 : LEVEL)[l] * w); by.push(cid); } else if (w >= 1 || CARD[cid].r === AT[aid].r) gap.push(cid); }); return { pct: Math.min(CAP, 1 - miss), by, gap }; }
   function cost1(sel) { return Object.keys(sel || {}).reduce((s, k) => s + sel[k] * CARD[k].p, 0); }
   function cost2(add) { return Object.keys(add || {}).reduce((s, k) => s + add[k] * (CARD[k].p + (CARD[k].r === 1 ? UPG : 0)), 0); }
   function coins(p) { const c1 = START1 + EXTRA * (p.b1 || 0) - cost1(p.r1); const c2 = c1 + START2 + EXTRA * (p.b2 || 0) - cost2(p.r2); return { c1, c2 }; }
@@ -47,5 +47,5 @@
     const buys = (p.b1 || 0) + (p.b2 || 0), pen = buys * EXTRA_PEN, base = Math.round(100 * avg * avg);
     return { r1, r2, avg1, avg2, avg, base, pen, buys, score: Math.max(0, base - pen) };
   }
-  window.PX = { BASE, LEVEL, START1, START2, EXTRA, EXTRA_PEN, MAX_EXTRA, UPG, R1, R2, CARD, AT, POOL, SECTORS, draw, lv, block, cost1, cost2, coins, evaluate };
+  window.PX = { BASE, LEVEL, LEVEL2, START1, START2, EXTRA, EXTRA_PEN, MAX_EXTRA, UPG, R1, R2, CARD, AT, POOL, SECTORS, draw, lv, block, cost1, cost2, coins, evaluate };
 })();
