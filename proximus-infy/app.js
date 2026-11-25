@@ -55,7 +55,7 @@
   }
   const vSector = () => `${brand}<h2>Choose your sector</h2><p>You will protect an AI agent from that world.</p><div style="margin-top:10px">${Object.keys(P.SECTORS).map(k => { const s = P.SECTORS[k]; return `<div class="sec ${cur.sector === k ? 'on' : ''}" data-act="sector" data-id="${k}"><span class="o">${s.e}</span><div>${s.n}<small>${s.sub}</small></div></div>`; }).join('')}</div>`;
   function vUse() { const s = P.SECTORS[cur.sector]; return `${brand}${arena('lg')}<div class="kick" style="text-align:center">YOUR AGENT · ${s.n.toUpperCase()}</div><h2 style="text-align:center">${s.agent}</h2><p style="text-align:center">${s.t}</p>
-    <p style="margin-top:12px;text-align:center"><b style="color:#fff">DEFCON 3, then DEFCON 5 · 3 random attacks each</b><br><span style="font-size:12px">DEFCON = Defense Readiness Condition</span><br>Buy defences with your coins. Survive. Upgrade. Survive harder.</p><p style="margin-top:8px;text-align:center">⏱ <b style="color:var(--gold)">2:00</b> per round, or tap Submit when ready.</p>${legend()}<div class="gap"></div><button class="go gold" data-act="start1">ENTER DEFCON 3 ▶</button>`; }
+    <p style="margin-top:12px;text-align:center"><b style="color:#fff">DEFCON 3, then DEFCON 5 · 3 random attacks in total</b><br><span style="font-size:12px">DEFCON = Defense Readiness Condition</span><br>Buy defences with your coins. Survive. Upgrade. Survive harder.</p><p style="margin-top:8px;text-align:center">⏱ <b style="color:var(--gold)">2:00</b> per round, or tap Submit when ready.</p>${legend()}<div class="gap"></div><button class="go gold" data-act="start1">ENTER DEFCON 3 ▶</button>`; }
   /* ---------- ring shop ---------- */
   const LC = ['#2a3560', '#2be0ff', '#3dffb0', '#ffcf4d'], LNm = ['', 'Light', 'Strong', 'Very strong'];
   const ell = (n, rx, ry, cx, cy) => Array.from({ length: n }, (_, i) => { const a = (-90 + i * 360 / n) * Math.PI / 180; return [cx + rx * Math.cos(a), cy + ry * Math.sin(a)]; });
@@ -79,11 +79,11 @@
     return `<div class="topbar">${head(`<span class="pill">DEFCON ${dc}</span><span class="pill tm" id="tm">⏱ ${fmtT(remain())}</span><button class="pill mute" data-act="mute">${muted() ? '🔇' : '🔊'}</button>`)}
     <div class="coins"><span class="coin">${left}</span><div><b id="cl">${left}</b><small>coins left</small></div><button class="buy" id="buy" data-act="buy" ${buys >= P.MAX_EXTRA ? 'disabled' : ''}>+${P.EXTRA} COINS<small>costs −${P.EXTRA_PEN} points</small></button></div></div>${tabs}
     <div class="rg"><div class="el" style="width:74%;height:68%"></div><div class="el" style="width:49%;height:46%;opacity:.5"></div>${centreH()}${stage}</div>
-    <div class="tip">Tap <b>+</b> to buy a level, <b>−</b> to take it back. The arc fills as you add levels: <span style="color:#2be0ff">Light 50%</span> · <span style="color:#3dffb0">Strong 70%</span> · <span style="color:#ffcf4d">Very strong 100%</span>. 3 random attacks hit when you submit.${buys ? ` Extra coin packs bought: ${buys}.` : ''}</div><div class="subw"><button class="go" data-act="submit">SUBMIT DEFCON ${dc} ▶</button></div>`;
+    <div class="tip">Tap <b>+</b> to buy a level, <b>−</b> to take it back. The arc fills as you add levels: <span style="color:#2be0ff">Light 50%</span> · <span style="color:#3dffb0">Strong 70%</span> · <span style="color:#ffcf4d">Very strong 100%</span>. Random attacks hit when you submit (3 in total across both DEFCONs).${buys ? ` Extra coin packs bought: ${buys}.` : ''}</div><div class="subw"><button class="go" data-act="submit">SUBMIT DEFCON ${dc} ▶</button></div>`;
   }
   function vAttack(r) {
-    const dc = r === 1 ? 3 : 5;
-    return `${head(`<span class="pill">DEFCON ${dc}</span><span class="pill" id="albl">3 ATTACKS</span>`)}<div class="astrip" id="strip">${[1, 2, 3].map(i => `<div id="sp${i}"><b>${i}</b> Waiting<small></small></div>`).join('')}</div>
+    const dc = r === 1 ? 3 : 5, res0 = P.evaluate(cur)['r' + r], nA = res0.length, off = r === 2 ? P.evaluate(cur).r1.length : 0;
+    return `${head(`<span class="pill">DEFCON ${dc}</span><span class="pill" id="albl">${nA} ATTACK${nA > 1 ? 'S' : ''}</span>`)}<div class="astrip" id="strip" style="grid-template-columns:repeat(${nA},1fr)">${res0.map((_, i) => `<div id="sp${i + 1}"><b>${off + i + 1}</b> Waiting<small></small></div>`).join('')}</div>
     <div class="aw" id="aw"><div class="el" style="width:74%;height:70%"></div><div class="el" style="width:49%;height:46%;opacity:.5"></div>${centreH()}<div id="dfs"></div><div id="abn"></div></div><div id="rep"></div><div class="gap"></div><button class="go gold" id="nx" data-act="${r === 1 ? 'start2' : 'score'}" disabled>${r === 1 ? 'DEFCON 5 ▶' : 'SEE MY SCORE ▶'}</button>`;
   }
   function vScore() {
@@ -124,13 +124,13 @@
     3: w => `<svg width="${w}" viewBox="0 0 90 160"><defs><linearGradient id="wh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4a6300"/><stop offset="1" stop-color="#ff9f43"/></linearGradient></defs><path d="M45 0 L62 38 L28 38 Z" fill="url(#wh)"/><polygon points="28,86 6,52 28,56" fill="#ff3b3b"/><polygon points="62,86 84,52 62,56" fill="#ff3b3b"/><path d="M28 38 H62 V104 L45 156 L28 104 Z" fill="#e8ecf6" stroke="#ff3b3b" stroke-width="2.5"/><path d="M28 104 L45 156 L62 104 Z" fill="#ff3b3b"/><rect x="28" y="62" width="34" height="7" fill="#ff3b3b"/><circle cx="45" cy="84" r="6" fill="#ffd166"/></svg>` };
   const WNAME = ['', 'Bolt', 'Missile', 'Heavy missile'], WW = [0, 40, 54, 78];
   function runAttacks(r) {
-    const res = P.evaluate(cur)['r' + r], L = r === 1 ? cur.r1 : P.capMit(P.lv(cur.r1, cur.r2)), $a = document.getElementById('aw'), $d = document.getElementById('dfs'), $b = document.getElementById('abn'), $n = document.getElementById('nx'), $rep = document.getElementById('rep'), $ph = document.querySelector('.ph');
+    const res = P.evaluate(cur)['r' + r], off = r === 2 ? P.evaluate(cur).r1.length : 0, L = r === 1 ? cur.r1 : P.capMit(P.lv(cur.r1, cur.r2)), $a = document.getElementById('aw'), $d = document.getElementById('dfs'), $b = document.getElementById('abn'), $n = document.getElementById('nx'), $rep = document.getElementById('rep'), $ph = document.querySelector('.ph');
     const owned = Object.keys(L).filter(k => L[k] > 0), pos = ell(owned.length, 140, 205, 195, 320);
     $d.innerHTML = owned.map((id, i) => `<div class="dfi" data-id="${id}" style="left:${(pos[i][0] / 390 * 100).toFixed(2)}%;top:${pos[i][1]}px"><div class="w">${arcSVG(L[id], 44)}<span>${P.CARD[id].e}</span></div></div>`).join('');
     const sp = i => document.getElementById('sp' + (i + 1)), cls = p => p >= .7 ? 'g' : p >= .45 ? 'w' : 'l';
-    const setSp = (i, st, t, s) => { const e = sp(i); e.className = st; e.innerHTML = `<b>${i + 1}</b> ${t}<small>${s}</small>`; };
+    const setSp = (i, st, t, s) => { const e = sp(i); e.className = st; e.innerHTML = `<b>${off + i + 1}</b> ${t}<small>${s}</small>`; };
     const replay = () => {
-      const avg = res.reduce((s, x) => s + x.pct, 0) / 3; $a.classList.add('gone'); document.getElementById('strip').classList.add('gone'); document.getElementById('albl').textContent = pc(avg) + '% BLOCKED';
+      const avg = res.reduce((s, x) => s + x.pct, 0) / res.length; $a.classList.add('gone'); document.getElementById('strip').classList.add('gone'); document.getElementById('albl').textContent = pc(avg) + '% BLOCKED';
       $rep.innerHTML = `<div class="rph"><b>WHAT HIT YOU</b><span>DEFCON ${r === 1 ? 3 : 5} · average ${pc(avg)}% blocked</span></div>` + res.map(x => { const a = P.AT[x.a];
         return `<div class="rc"><div class="rt"><span class="e">${a.e}</span><b>${a.n}</b><span class="p ${cls(x.pct)}">${pc(x.pct)}%</span></div><small>${esc(a.t)}</small><div class="rbar"><i class="${cls(x.pct)}" style="width:${pc(x.pct)}%"></i></div>
         <div class="rs">Stopped by: ${x.by.length ? x.by.map(i => P.CARD[i].e + ' ' + esc(P.CARD[i].n)).join(' · ') : 'nothing in place'}</div>${x.pct < .7 && x.gap.length ? `<div class="rg2">Gap: ${x.gap.map(i => esc(P.CARD[i].n)).join(', ')}</div>` : ''}</div>`; }).join('');
@@ -141,10 +141,10 @@
     let i = 0;
     const step = () => {
       if (i >= res.length) { sfx('fanfare'); setTimeout(replay, 1300); return; }
-      const x = res[i], a = P.AT[x.a], k = i + 1, W = $a.clientWidth, H = $a.clientHeight, cx = W / 2, cy = 314;
+      const x = res[i], a = P.AT[x.a], k = off + i + 1, W = $a.clientWidth, H = $a.clientHeight, cx = W / 2, cy = 314;
       setSp(i, 'now', 'Incoming', 'hits now');
       $b.innerHTML = `<div class="abn s${k}"><div class="kk">ATTACK ${k} OF 3 · ${WNAME[k].toUpperCase()}</div><b>${a.e} ${a.n}</b><small>${esc(a.t)}</small></div>`; sfx('whoosh'); buzz(10);
-      const side = [-1, 0, 1][i], sx = cx + side * W * .34, sy = 90, ang = Math.atan2(-(cx - sx), (cy - sy)) * 180 / Math.PI, w = WW[k], hh = w * (k === 1 ? 2 : k === 2 ? 2.33 : 1.78);
+      const side = [-1, 1, 0][k - 1], sx = cx + side * W * .34, sy = 90, ang = Math.atan2(-(cx - sx), (cy - sy)) * 180 / Math.PI, w = WW[k], hh = w * (k === 1 ? 2 : k === 2 ? 2.33 : 1.78);
       const m = document.createElement('div'); m.className = 'wp'; m.innerHTML = WEAPON[k](w); $a.appendChild(m);
       const an = m.animate([{ left: sx + 'px', top: sy + 'px', transform: `translate(-50%,0) rotate(${ang}deg)`, opacity: 0 }, { opacity: 1, offset: .12 }, { left: cx + 'px', top: (cy - hh * .9) + 'px', transform: `translate(-50%,0) rotate(${ang}deg)`, opacity: 1 }], { duration: 1100 - k * 90, delay: 900, easing: 'ease-in', fill: 'forwards' });
       an.onfinish = () => {
