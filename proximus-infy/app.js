@@ -161,7 +161,7 @@
         $ph.classList.remove('s1', 's2', 's3'); void $ph.offsetWidth; $ph.classList.add('s' + wk); setTimeout(() => $ph.classList.remove('s' + wk), 900);
         const v = document.createElement('div'); v.className = 'vig v' + wk; document.body.appendChild(v); setTimeout(() => v.remove(), 900);
         const c = document.getElementById('ctr'); c.classList.add('hot'); setTimeout(() => c.classList.remove('hot'), 900);
-        sfx(x.pct >= .45 ? 'shield' : 'boom'); if (wk > 1) setTimeout(() => sfx('boom'), 120); buzz(wk === 1 ? 25 : wk === 2 ? [40, 30, 50] : [70, 40, 90]);
+        sfx('impact', wk); if (x.pct >= .45) setTimeout(() => sfx('shield'), 900); buzz(wk === 1 ? 25 : wk === 2 ? [40, 30, 50] : [70, 40, 90]);
         x.by.forEach(id => { const e = $d.querySelector(`.dfi[data-id="${id}"]`); if (e) { e.classList.add('help'); setTimeout(() => e.classList.remove('help'), 1800); } });
         const st = document.createElement('div'); st.className = 'bstamp ' + cls(x.pct); st.innerHTML = `${pc(x.pct)}% BLOCKED`; $a.appendChild(st); setTimeout(() => st.remove(), 1700);
         setSp(i, 'ok ' + cls(x.pct), 'Blocked', pc(x.pct) + '%'); i++; setTimeout(() => { $b.innerHTML = ''; step(); }, 2100);

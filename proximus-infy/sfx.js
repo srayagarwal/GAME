@@ -45,6 +45,11 @@
   S.bed = function (on) { clearInterval(bedT); bedT = null; if (!on) return; step = 0; bedT = setInterval(() => { if (!ok()) return; const t = ctx.currentTime, i = step++ % 16;
     if (i % 4 === 0) { tone('sine', 90, t, 0.004, 0.32, 0.16, 45); } if (i % 2 === 1) burst(t, 'highpass', 7000, 0.5, 0.05, 0.04);
     tone('triangle', NOTES[i], t, 0.005, 0.09, 0.2); if (i % 8 === 4) tone('sine', NOTES[i] * 4, t, 0.005, 0.04, 0.35); }, 150); };
+  /* deep cinematic "boom..." for an attack impact: tier 1 bolt, 2 missile, 3 heavy missile (deeper, longer, louder) */
+  S.impact = function (tier = 1) { if (!ok()) return; const t = ctx.currentTime, k = [0, 0.7, 0.9, 1.1][tier] || 0.9, L = [0, 1.3, 1.8, 2.5][tier] || 1.8;
+    tone('sine', 95, t, 0.004, 1.0 * k, L, 26); tone('sine', 48, t, 0.006, 0.9 * k, L * 0.9, 22); burst(t, 'lowpass', 260, 0.7, 0.85 * k, L * 0.55);
+    burst(t, 'lowpass', 1200, 0.5, 0.5 * k, 0.12); tone('sawtooth', 120, t, 0.004, 0.12 * k, 0.3, 50);
+    [[0.32, 0.45], [0.66, 0.25], [1.0, 0.12]].forEach(([x, p]) => { if (x < L) { tone('sine', 62, t + x, 0.01, p * k, 0.7, 28); burst(t + x, 'lowpass', 200, 0.7, p * 0.6 * k, 0.5); } }); };
   S.setMute = function (m) { on = !m; if (m) S.bed(false); };
   ['pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, unlock, { passive: true }));
   window.SFX = S;
