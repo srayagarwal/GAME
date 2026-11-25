@@ -55,8 +55,10 @@
     const a1 = draw(p.seed || 1, 1), a2 = draw(p.seed || 1, 2), L1 = p.r1 || {}, L2 = capMit(lv(L1, p.r2 || {}));
     const r1 = a1.map(a => Object.assign({ a }, block(a, L1))), r2 = a2.map(a => Object.assign({ a }, block(a, L2)));
     const sum = a => a.reduce((s, x) => s + x.pct, 0), avg1 = sum(r1) / r1.length, avg2 = sum(r2) / r2.length, avg = (sum(r1) + sum(r2)) / (r1.length + r2.length);
-    // quadratic per attack: score = 100 × mean of (blocked)² over every attack, minus extra-coin penalty
-    const all = r1.concat(r2), sq = all.reduce((s, x) => s + x.pct * x.pct, 0) / all.length;
+    // quadratic per attack, weighted by damage: score = 100 × Σ w·(blocked)² / Σ w, minus extra-coin penalty
+    // damage escalates with the weapon: bolt x1, missile x2, heavy missile x3 (same tier as the attack animation)
+    const all = r1.concat(r2); all.forEach((x, i) => x.w = Math.ceil((i + 1) * 3 / all.length));
+    const wsum = all.reduce((s, x) => s + x.w, 0), sq = all.reduce((s, x) => s + x.w * x.pct * x.pct, 0) / wsum;
     const buys = (p.b1 || 0) + (p.b2 || 0), pen = buys * EXTRA_PEN, base = Math.round(100 * sq);
     return { r1, r2, avg1, avg2, avg, sq, base, pen, buys, score: Math.max(0, base - pen) };
   }

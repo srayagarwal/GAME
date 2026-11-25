@@ -89,7 +89,7 @@
   function vScore() {
     const e = P.evaluate(cur), list = rows(), rank = list.findIndex(x => x.id === cur.id) + 1, all = e.r1.concat(e.r2), f2 = x => (Math.round(x * 100) / 100).toFixed(2);
     return `${head('<span class="pill">FINAL</span>')}${arena('lg')}<div class="big">0<small>/100</small></div>
-    <div class="math">Score = 100 × average of (blocked)² over ${all.length} attacks<br><b>(${all.map(x => f2(x.pct * x.pct)).join(' + ')}) ÷ ${all.length} = ${f2(e.sq)} → ${e.base}</b>${e.buys ? `<br>Extra coins bought: <b style="color:#ff9aa8">−${e.pen}</b>` : ''}</div>
+    <div class="math">Score = 100 × damage-weighted average of (blocked)²<br>Bolt ×1 · Missile ×2 · Heavy missile ×3<br><b>(${all.map(x => x.w + '×' + f2(x.pct * x.pct)).join(' + ')}) ÷ ${all.reduce((s, x) => s + x.w, 0)} = ${f2(e.sq)} → ${e.base}</b>${e.buys ? `<br>Extra coins bought: <b style="color:#ff9aa8">−${e.pen}</b>` : ''}</div>
     <div class="row3"><span class="pill">DEFCON 3 ${pc(e.avg1)}%</span><span class="pill">DEFCON 5 ${pc(e.avg2)}%</span><span class="pill">${rank ? '#' + rank + ' / ' + list.length : '…'}</span></div><p style="text-align:center">Your analysis and the best strategy will be emailed after the event.</p><div class="gap"></div><button class="go" data-act="board">LEADERBOARD ▶</button>`;
   }
   function vBoard() {
@@ -134,7 +134,7 @@
       const avg = res.reduce((s, x) => s + x.pct, 0) / res.length; $a.classList.add('gone'); document.getElementById('strip').classList.add('gone'); document.getElementById('albl').textContent = pc(avg) + '% BLOCKED';
       $rep.innerHTML = `<div class="rph"><b>WHAT HIT YOU</b><span>DEFCON ${r === 1 ? 3 : 5} · average ${pc(avg)}% blocked</span></div>` + res.map(x => { const a = P.AT[x.a];
         return `<div class="rc"><div class="rt"><span class="e">${a.e}</span><b>${a.n}</b><span class="p ${cls(x.pct)}">${pc(x.pct)}%</span></div><small>${esc(a.t)}</small><div class="rbar"><i class="${cls(x.pct)}" style="width:${pc(x.pct)}%"></i></div>
-        <div class="rs">Counts as ${(x.pct * x.pct).toFixed(2)} of 1.00 (blocked²) · Stopped by: ${x.by.length ? x.by.map(i => P.CARD[i].e + ' ' + esc(P.CARD[i].n)).join(' · ') : 'nothing in place'}</div>${x.pct < .7 && x.gap.length ? `<div class="rg2">Gap: ${x.gap.map(i => esc(P.CARD[i].n)).join(', ')}</div>` : ''}</div>`; }).join('');
+        <div class="rs">${['', 'Bolt', 'Missile', 'Heavy missile'][x.w]} · damage ×${x.w} · counts ${(x.pct * x.pct).toFixed(2)} (blocked²) · Stopped by: ${x.by.length ? x.by.map(i => P.CARD[i].e + ' ' + esc(P.CARD[i].n)).join(' · ') : 'nothing in place'}</div>${x.pct < .7 && x.gap.length ? `<div class="rg2">Gap: ${x.gap.map(i => esc(P.CARD[i].n)).join(', ')}</div>` : ''}</div>`; }).join('');
       $n.disabled = false; ui.animDone[cur.id + r] = 1;
     };
     if (ui.animDone[cur.id + r]) { replay(); return; }
@@ -144,7 +144,7 @@
       if (i >= res.length) { sfx('fanfare'); setTimeout(replay, 1300); return; }
       const x = res[i], a = P.AT[x.a], k = off + i + 1, NT = P.split(cur.seed || 1).n, wk = Math.ceil(k * 3 / NT), W = $a.clientWidth, H = $a.clientHeight, cx = W / 2, cy = 314;
       setSp(i, 'now', 'Incoming', 'hits now');
-      $b.innerHTML = `<div class="abn s${wk}"><div class="kk">ATTACK ${k} OF ${NT} · ${WNAME[wk].toUpperCase()}</div><b>${a.e} ${a.n}</b><small>${esc(a.t)}</small></div>`; sfx('whoosh'); buzz(10);
+      $b.innerHTML = `<div class="abn s${wk}"><div class="kk">ATTACK ${k} OF ${NT} · ${WNAME[wk].toUpperCase()} · DAMAGE ×${wk}</div><b>${a.e} ${a.n}</b><small>${esc(a.t)}</small></div>`; sfx('whoosh'); buzz(10);
       const side = [-1, 1, 0][(k - 1) % 3], sx = cx + side * W * .34, sy = 90, ang = Math.atan2(-(cx - sx), (cy - sy)) * 180 / Math.PI, w = WW[wk], hh = w * (wk === 1 ? 2 : wk === 2 ? 2.33 : 1.78);
       const m = document.createElement('div'); m.className = 'wp'; m.innerHTML = WEAPON[wk](w); $a.appendChild(m);
       const an = m.animate([{ left: sx + 'px', top: sy + 'px', transform: `translate(-50%,0) rotate(${ang}deg)`, opacity: 0 }, { opacity: 1, offset: .12 }, { left: cx + 'px', top: (cy - hh * .9) + 'px', transform: `translate(-50%,0) rotate(${ang}deg)`, opacity: 1 }], { duration: 1100 - wk * 90, delay: 900, easing: 'ease-in', fill: 'forwards' });
