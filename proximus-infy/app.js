@@ -86,10 +86,16 @@
     return `${head(`<span class="pill">DEFCON ${dc}</span><span class="pill" id="albl">${nA} ATTACK${nA > 1 ? 'S' : ''}</span>`)}<div class="astrip" id="strip" style="grid-template-columns:repeat(${nA},1fr)">${res0.map((_, i) => `<div id="sp${i + 1}"><b>${off + i + 1}</b> Waiting<small></small></div>`).join('')}</div>
     <div class="aw" id="aw"><div class="el" style="width:74%;height:70%"></div><div class="el" style="width:49%;height:46%;opacity:.5"></div>${centreH()}<div id="dfs"></div><div id="abn"></div></div><div id="rep"></div><div class="gap"></div><button class="go gold" id="nx" data-act="${r === 1 ? 'start2' : 'score'}" disabled>${r === 1 ? 'DEFCON 5 ▶' : 'SEE MY SCORE ▶'}</button>`;
   }
+  const SHORTA = { LEAK: 'Data leak', KNOWN: 'Known flaw', BAD: 'Bad action', DEEP: 'Deepfake', IMPER: 'Impersonation', EUACT: 'EU AI Act probe', AIFLAW: 'AI-found flaw', UNPATCH: 'Unpatched flaw', JAIL: 'Jailbreak chain' };
   function vScore() {
     const e = P.evaluate(cur), list = rows(), rank = list.findIndex(x => x.id === cur.id) + 1, all = e.r1.concat(e.r2), f2 = x => (Math.round(x * 100) / 100).toFixed(2);
     return `${head('<span class="pill">FINAL</span>')}${arena('lg')}<div class="big">0<small>/100</small></div>
-    <div class="math">Score = 100 × damage-weighted average of (blocked)²<br>Bolt ×1 · Missile ×2 · Heavy missile ×4<br><b>(${all.map(x => x.w + '×' + f2(x.pct * x.pct)).join(' + ')}) ÷ ${all.reduce((s, x) => s + x.w, 0)} = ${f2(e.sq)} → ${e.base}</b>${e.buys ? `<br>Extra coins bought: <b style="color:#ff9aa8">−${e.pen}</b>` : ''}</div>
+    <div class="how"><b>HOW YOUR SCORE WORKS</b>
+      <ol><li>For each attack we take the share you <b>blocked</b>, then <b>square</b> it. Blocking 90% earns <b>0.81</b>, blocking 50% only <b>0.25</b>, so strong defences pay off.</li>
+      <li>Heavier weapons count more: <b>bolt ×1 · missile ×2 · heavy missile ×4</b>.</li>
+      <li>Add the points, divide by the total weight, multiply by 100.</li></ol>
+      <table><tr><th>Attack</th><th>Blocked</th><th>Squared × weight</th><th>Points</th></tr>${all.map(x => `<tr><td>${P.AT[x.a].e} ${esc(SHORTA[x.a] || P.AT[x.a].n)}</td><td>${pc(x.pct)}%</td><td>${f2(x.sqr)} × ${x.w}</td><td>${f2(x.w * x.sqr)}</td></tr>`).join('')}
+      <tr class="tt"><td>Total</td><td></td><td>÷ ${all.reduce((s, x) => s + x.w, 0)} (weights)</td><td>${f2(e.sq)} → <b>${e.base}</b></td></tr></table>${e.buys ? `<div style="margin-top:6px">Extra coin packs bought: <b style="color:#ff9aa8">−${e.pen}</b></div>` : ''}</div>
     <div class="row3"><span class="pill">DEFCON 3 ${pc(e.avg1)}%</span><span class="pill">DEFCON 5 ${pc(e.avg2)}%</span><span class="pill">${rank ? '#' + rank + ' / ' + list.length : '…'}</span></div><p style="text-align:center">Your analysis and the best strategy will be emailed after the event.</p><div class="gap"></div><button class="go" data-act="board">LEADERBOARD ▶</button>`;
   }
   function vBoard() {
