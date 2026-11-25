@@ -55,8 +55,10 @@
     const a1 = draw(p.seed || 1, 1), a2 = draw(p.seed || 1, 2), L1 = p.r1 || {}, L2 = capMit(lv(L1, p.r2 || {}));
     const r1 = a1.map(a => Object.assign({ a }, block(a, L1))), r2 = a2.map(a => Object.assign({ a }, block(a, L2)));
     const sum = a => a.reduce((s, x) => s + x.pct, 0), avg1 = sum(r1) / r1.length, avg2 = sum(r2) / r2.length, avg = (sum(r1) + sum(r2)) / (r1.length + r2.length);
-    const buys = (p.b1 || 0) + (p.b2 || 0), pen = buys * EXTRA_PEN, base = Math.round(100 * avg * avg);
-    return { r1, r2, avg1, avg2, avg, base, pen, buys, score: Math.max(0, base - pen) };
+    // quadratic per attack: score = 100 × mean of (blocked)² over every attack, minus extra-coin penalty
+    const all = r1.concat(r2), sq = all.reduce((s, x) => s + x.pct * x.pct, 0) / all.length;
+    const buys = (p.b1 || 0) + (p.b2 || 0), pen = buys * EXTRA_PEN, base = Math.round(100 * sq);
+    return { r1, r2, avg1, avg2, avg, sq, base, pen, buys, score: Math.max(0, base - pen) };
   }
   window.PX = { BASE, LEVEL, LEVEL2, START1, START2, EXTRA, EXTRA_PEN, MAX_EXTRA, UPG, R1, R2, CARD, AT, POOL, SECTORS, draw, split, total, lv, scanLv, capMit, block, cost1, cost2, coins, evaluate };
 })();

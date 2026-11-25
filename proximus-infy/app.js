@@ -87,8 +87,9 @@
     <div class="aw" id="aw"><div class="el" style="width:74%;height:70%"></div><div class="el" style="width:49%;height:46%;opacity:.5"></div>${centreH()}<div id="dfs"></div><div id="abn"></div></div><div id="rep"></div><div class="gap"></div><button class="go gold" id="nx" data-act="${r === 1 ? 'start2' : 'score'}" disabled>${r === 1 ? 'DEFCON 5 ▶' : 'SEE MY SCORE ▶'}</button>`;
   }
   function vScore() {
-    const e = P.evaluate(cur), list = rows(), rank = list.findIndex(x => x.id === cur.id) + 1;
-    return `${head('<span class="pill">FINAL</span>')}${arena('lg')}<div class="big">0<small>/100</small></div><div class="math">Blocked <b>${pc(e.avg)}%</b> overall → <b>${pc(e.avg)}% × ${pc(e.avg)}% = ${e.base}</b>${e.buys ? `<br>Extra coins bought: <b style="color:#ff9aa8">−${e.pen}</b>` : ''}</div>
+    const e = P.evaluate(cur), list = rows(), rank = list.findIndex(x => x.id === cur.id) + 1, all = e.r1.concat(e.r2), f2 = x => (Math.round(x * 100) / 100).toFixed(2);
+    return `${head('<span class="pill">FINAL</span>')}${arena('lg')}<div class="big">0<small>/100</small></div>
+    <div class="math">Score = 100 × average of (blocked)² over ${all.length} attacks<br><b>(${all.map(x => f2(x.pct * x.pct)).join(' + ')}) ÷ ${all.length} = ${f2(e.sq)} → ${e.base}</b>${e.buys ? `<br>Extra coins bought: <b style="color:#ff9aa8">−${e.pen}</b>` : ''}</div>
     <div class="row3"><span class="pill">DEFCON 3 ${pc(e.avg1)}%</span><span class="pill">DEFCON 5 ${pc(e.avg2)}%</span><span class="pill">${rank ? '#' + rank + ' / ' + list.length : '…'}</span></div><p style="text-align:center">Your analysis and the best strategy will be emailed after the event.</p><div class="gap"></div><button class="go" data-act="board">LEADERBOARD ▶</button>`;
   }
   function vBoard() {
@@ -133,7 +134,7 @@
       const avg = res.reduce((s, x) => s + x.pct, 0) / res.length; $a.classList.add('gone'); document.getElementById('strip').classList.add('gone'); document.getElementById('albl').textContent = pc(avg) + '% BLOCKED';
       $rep.innerHTML = `<div class="rph"><b>WHAT HIT YOU</b><span>DEFCON ${r === 1 ? 3 : 5} · average ${pc(avg)}% blocked</span></div>` + res.map(x => { const a = P.AT[x.a];
         return `<div class="rc"><div class="rt"><span class="e">${a.e}</span><b>${a.n}</b><span class="p ${cls(x.pct)}">${pc(x.pct)}%</span></div><small>${esc(a.t)}</small><div class="rbar"><i class="${cls(x.pct)}" style="width:${pc(x.pct)}%"></i></div>
-        <div class="rs">Stopped by: ${x.by.length ? x.by.map(i => P.CARD[i].e + ' ' + esc(P.CARD[i].n)).join(' · ') : 'nothing in place'}</div>${x.pct < .7 && x.gap.length ? `<div class="rg2">Gap: ${x.gap.map(i => esc(P.CARD[i].n)).join(', ')}</div>` : ''}</div>`; }).join('');
+        <div class="rs">Counts as ${(x.pct * x.pct).toFixed(2)} of 1.00 (blocked²) · Stopped by: ${x.by.length ? x.by.map(i => P.CARD[i].e + ' ' + esc(P.CARD[i].n)).join(' · ') : 'nothing in place'}</div>${x.pct < .7 && x.gap.length ? `<div class="rg2">Gap: ${x.gap.map(i => esc(P.CARD[i].n)).join(', ')}</div>` : ''}</div>`; }).join('');
       $n.disabled = false; ui.animDone[cur.id + r] = 1;
     };
     if (ui.animDone[cur.id + r]) { replay(); return; }
