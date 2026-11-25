@@ -33,6 +33,19 @@
     ring(t0 = 0) { if (!ok()) return; const t = ctx.currentTime + t0; [[1319, 0], [988, .14], [1175, .28], [1568, .42], [1319, .7], [988, .84], [1175, .98], [1568, 1.12]].forEach(([f, x]) => { tone('sine', f, t + x, 0.005, 0.32, 0.16); tone('triangle', f * 2, t + x, 0.005, 0.06, 0.1); }); },
     heartbeat(n = 3, t0 = 0) { if (!ok()) return; for (let i = 0; i < n; i++) { const t = ctx.currentTime + t0 + i * 0.8; tone('sine', 60, t, 0.01, 0.9, 0.18, 40); tone('sine', 55, t + 0.22, 0.01, 0.6, 0.2, 38); } },
   };
+
+  /* Proximus extras: card buy, level-up arpeggio, denied buzz, coin clink, looping game bed */
+  S.coin = function (t0 = 0) { if (!ok()) return; const t = ctx.currentTime + t0; tone('sine', 1760, t, 0.002, 0.2, 0.12); tone('sine', 2637, t + 0.06, 0.002, 0.22, 0.25); };
+  S.buy = function (lvl = 1) { if (!ok()) return; const t = ctx.currentTime; burst(t, 'lowpass', 700, 0.7, 0.5, 0.12); tone('sine', 140, t, 0.003, 0.7, 0.2, 60); S.coin(0.02);
+    const n = [[523, 659], [523, 659, 784], [523, 659, 784, 1047, 1319]][Math.min(3, lvl) - 1]; n.forEach((f, i) => { tone('triangle', f, t + 0.08 + i * 0.07, 0.004, 0.26, 0.28); tone('square', f / 2, t + 0.08 + i * 0.07, 0.004, 0.05, 0.2); }); if (lvl >= 3) burst(t + 0.3, 'highpass', 6000, 0.4, 0.3, 0.8, 0.01); };
+  S.undo = function () { if (!ok()) return; const t = ctx.currentTime; tone('triangle', 520, t, 0.003, 0.3, 0.12, 300); burst(t, 'bandpass', 1500, 1.2, 0.2, 0.06); };
+  S.deny = function () { if (!ok()) return; const t = ctx.currentTime; tone('sawtooth', 150, t, 0.005, 0.35, 0.12, 100); tone('sawtooth', 120, t + 0.1, 0.005, 0.35, 0.16, 80); };
+  S.horn = function () { if (!ok()) return; const t = ctx.currentTime; [[196, 0], [294, 0.18], [392, 0.36]].forEach(([f, x]) => { tone('sawtooth', f, t + x, 0.02, 0.22, 0.4); tone('square', f * 2, t + x, 0.02, 0.05, 0.3); }); burst(t, 'lowpass', 300, 0.7, 0.4, 0.5); };
+  let bedT = null, step = 0; const NOTES = [110, 110, 165, 110, 131, 131, 196, 131, 98, 98, 147, 98, 123, 123, 185, 123];
+  S.bed = function (on) { clearInterval(bedT); bedT = null; if (!on) return; step = 0; bedT = setInterval(() => { if (!ok()) return; const t = ctx.currentTime, i = step++ % 16;
+    if (i % 4 === 0) { tone('sine', 90, t, 0.004, 0.32, 0.16, 45); } if (i % 2 === 1) burst(t, 'highpass', 7000, 0.5, 0.05, 0.04);
+    tone('triangle', NOTES[i], t, 0.005, 0.09, 0.2); if (i % 8 === 4) tone('sine', NOTES[i] * 4, t, 0.005, 0.04, 0.35); }, 150); };
+  S.setMute = function (m) { on = !m; if (m) S.bed(false); };
   ['pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, unlock, { passive: true }));
   window.SFX = S;
 })();

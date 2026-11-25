@@ -1,7 +1,7 @@
 /* Defend the Agent · rules. Cards can be bought up to 3 times: level 1 light, 2 strong, 3 very strong. */
 (function () {
   const LEVEL = [0, 0.55, 0.80, 0.92], CAP = 0.95, SECOND = 0.75, BASE = 0.30;
-  const START1 = 120, START2 = 80, EXTRA = 40, EXTRA_PEN = 6, MAX_EXTRA = 3, UPG = 10;
+  const START1 = 240, START2 = 150, EXTRA = 60, EXTRA_PEN = 6, MAX_EXTRA = 3, UPG = 10;
   // [id, emoji, name, short, price]
   const R1 = [
     ['AUD', '🧾', 'Audit trail', 'Regulator checks', 10], ['POL', '🛡️', 'Policy engine', 'Stops injection', 20], ['KILL', '🔌', 'Kill switch', 'Stops loops', 20],
