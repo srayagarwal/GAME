@@ -50,7 +50,7 @@
   function vClosed() { return `${brand}<h1>Opening soon</h1><p>The game is not open right now. This page opens by itself when the host starts it.</p><div class="gap"></div><div class="link" data-act="login">Already played? See your scores</div>`; }
   function vDetails() {
     const f = ui.form, v = k => esc(f[k] || '');
-    return `${brand}<h1>Defend the<br>agent</h1><p>Two rounds. Two minutes each. Buy defences for your AI agent, then random attacks hit it. Beat the other players.</p>${legend()}
+    return `${brand}<h1>Defend the<br>agent</h1><p>Two rounds. Two minutes each. Buy defences for your AI agent, then random attacks hit it. Beat the other players.</p>
     <div class="in hero" style="margin-top:12px"><label>USERNAME · SHOWN ON THE LEADERBOARD</label><input data-f="u" maxlength="16" autocomplete="off" value="${v('u')}" placeholder="Pick a username"></div>
     <div class="in"><label>FULL NAME</label><input data-f="name" autocomplete="off" value="${v('name')}"></div>
     <div class="in"><label>PHONE</label><input data-f="phone" type="tel" autocomplete="off" value="${v('phone')}"></div>
